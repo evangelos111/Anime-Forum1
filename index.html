@@ -164,8 +164,105 @@
   <button class="bn" data-view="chat">Chat</button>
 </nav>
 
+
+
+  <button class="fab" id="openComposer" aria-label="Neuen Post erstellen">+</button>
+
+<nav class="bottomNav" aria-label="Navigation">
+  <button class="bn" data-view="feed">Feed</button>
+  <button class="bn" data-view="following">Gefolgt</button>
+  <button class="bn" data-view="mine">Meine</button>
+  <button class="bn" data-view="friends">Freunde</button>
+  <button class="bn" data-view="chat">Chat</button>
+</nav>
+
+<!-- Fullscreen Composer (Modal/Sheet) -->
+<div class="sheet" id="composerSheet" hidden>
+  <div class="sheetTop">
+    <button class="btn" id="closeComposer">Abbrechen</button>
+    <div class="sheetTitle">Neuer Post</div>
+    <button class="btn primary" id="submitComposer">Posten</button>
+  </div>
+
+  <div class="sheetBody">
+    <div class="field">
+      <div class="label">Titel (optional)</div>
+      <input class="input" id="c_title" placeholder="Kurzer Titel…" />
+    </div>
+
+    <div class="field">
+      <div class="label">Nachricht *</div>
+      <textarea class="input" id="c_body" placeholder="Schreib deinen Post…" rows="6"></textarea>
+    </div>
+
+    <div class="grid2">
+      <div class="field">
+        <div class="label">Kategorie *</div>
+        <select class="select" id="c_category">
+          <option value="Allgemein">Allgemein</option>
+          <option value="Empfehlungen">Empfehlungen</option>
+          <option value="Theorien">Theorien</option>
+          <option value="News">News</option>
+          <option value="Fragen">Fragen</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <div class="label">Sichtbarkeit *</div>
+        <select class="select" id="c_privacy">
+          <option value="public">Öffentlich</option>
+          <option value="friends">Nur Freunde</option>
+          <option value="private">Privat</option>
+        </select>
+      </div>
+    </div>
+
+    <details class="details">
+      <summary>Anime-Details (optional)</summary>
+
+      <div class="field">
+        <div class="label">Anime Titel</div>
+        <input class="input" id="c_anime" placeholder="z.B. Naruto" />
+      </div>
+
+      <div class="grid2">
+        <div class="field">
+          <div class="label">Frage-Typ</div>
+          <select class="select" id="c_qtype">
+            <option value="">—</option>
+            <option value="Diskussion">Diskussion</option>
+            <option value="Empfehlung">Empfehlung</option>
+            <option value="Theorie">Theorie</option>
+            <option value="Spoiler">Spoiler</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <div class="label">Spoiler?</div>
+          <select class="select" id="c_spoiler">
+            <option value="false">Nein</option>
+            <option value="true">Ja</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field">
+        <div class="label">Tags (Komma-getrennt)</div>
+        <input class="input" id="c_tags" placeholder="shonen, action, 90s" />
+      </div>
+    </details>
+
+    <div class="field">
+      <div class="label">Datei/Foto (optional)</div>
+      <input class="input" id="c_file" type="file" />
+      <div class="muted">JPG/PNG geht sicher. Andere Dateien je nach Storage.</div>
+    </div>
+  </div>
+</div>
+
   <script type="module" src="app.js"></script>
 </body>
 </html>
+
 
 
