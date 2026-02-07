@@ -749,6 +749,33 @@ button, .btn, .miniBtn, .tab, .bn, input, select, textarea{
 }
 
 
+/* ===== FINAL MOBILE OVERRIDE (ganz unten lassen) ===== */
+@media (max-width: 900px){
+
+  /* 1) Sidebars wirklich weg */
+  aside.side{ display:none !important; }
+
+  /* 2) BottomNav + FAB + Sheet immer korrekt */
+  .bottomNav{ display:flex !important; }
+  .fab{ display:flex !important; }
+  .sheet{ display:block !important; }
+
+  /* 3) grid2 auf schmalen Handys 1 Spalte */
+  .grid2{ grid-template-columns: 1fr !important; }
+
+  /* 4) Modal: fullscreen (falls es doch mal erscheint) */
+  .modalCard{
+    width: 100% !important;
+    max-width: 100% !important;
+    border-radius: 16px !important;
+  }
+}
+.noScroll{
+  overflow: hidden !important;
+  height: 100% !important;
+}
+
+
 
 
 
