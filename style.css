@@ -554,6 +554,132 @@ button, .btn, .miniBtn, .tab, .bn, input, select, textarea{
     width: 100%;
   }
 }
+/* ===== Mobile App UI ===== */
+
+.bottomNav{ display:none; }
+.fab{ display:none; }
+.sheet{ display:none; }
+
+@media (max-width: 900px){
+
+  /* 1 Spalte, keine Sidebars */
+  .sidebar, aside, .leftCol, .rightCol{ display:none !important; }
+  .content, main, .centerCol, .feed{ width:100% !important; max-width:100% !important; }
+
+  /* Platz für BottomNav */
+  body{ padding-bottom: 78px; }
+
+  /* große Touch-Ziele */
+  .btn, button, .tab, .miniBtn{
+    min-height: 44px;
+    padding: 10px 12px;
+    border-radius: 14px;
+  }
+  input, textarea, select, .input, .select{
+    min-height: 44px;
+    font-size: 16px; /* verhindert iOS zoom */
+    border-radius: 14px;
+  }
+
+  /* Bottom Navigation */
+  .bottomNav{
+    display:flex;
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: 60;
+    gap: 8px;
+    padding: 10px;
+    border-top: 1px solid var(--line);
+    background: rgba(17,24,39,.92);
+    backdrop-filter: blur(12px);
+  }
+  .bottomNav .bn{
+    flex: 1;
+    border: 1px solid var(--line);
+    background: rgba(255,255,255,.05);
+    color: var(--text);
+    border-radius: 14px;
+    font-weight: 700;
+  }
+
+  /* Floating Action Button */
+  .fab{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    position: fixed;
+    right: 14px;
+    bottom: 92px;
+    width: 54px;
+    height: 54px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: rgba(96,165,250,.18);
+    color: var(--text);
+    font-size: 28px;
+    z-index: 70;
+  }
+
+  /* Fullscreen Composer Sheet */
+  .sheet{
+    display:block;
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    background: rgba(0,0,0,.55);
+    padding: 0;
+  }
+  .sheet[hidden]{ display:none; }
+
+  .sheetTop{
+    position: sticky;
+    top: 0;
+    display:flex;
+    align-items:center;
+    gap: 10px;
+    padding: 12px;
+    background: rgba(17,24,39,.96);
+    backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--line);
+  }
+  .sheetTitle{
+    flex: 1;
+    font-weight: 900;
+    text-align: center;
+  }
+
+  .sheetBody{
+    height: calc(100dvh - 62px);
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 12px;
+    background: rgba(17,24,39,.96);
+  }
+
+  .grid2{
+    display:grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  details.details{
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 10px 12px;
+    background: rgba(255,255,255,.04);
+  }
+  details.details summary{
+    font-weight: 800;
+    cursor: pointer;
+    padding: 6px 0;
+  }
+}
+
+@media (max-width: 420px){
+  .grid2{ grid-template-columns: 1fr; }
+}
+
+
 
 
 
