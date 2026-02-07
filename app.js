@@ -1458,9 +1458,18 @@ document.querySelectorAll(".bottomNav .bn").forEach(btn => {
     if (typeof refreshAll === "function") await refreshAll();
   });
 });
+// Mobile fix: beim Tippen das Feld in die Mitte scrollen (Keyboard-Friendly)
+document.addEventListener("focusin", (e) => {
+  const el = e.target;
+  if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT")) {
+    setTimeout(() => el.scrollIntoView({ block: "center", behavior: "smooth" }), 150);
+  }
+});
+
 
 
 boot();
+
 
 
 
