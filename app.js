@@ -1,8 +1,8 @@
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
 /** ====== CONFIG ====== */
-const SUPABASE_URL = "DEIN_SUPABASE_URL";
-const SUPABASE_ANON_KEY = "DEIN_SUPABASE_ANON_KEY";
+const SUPABASE_URL = "https://kdzjlyvquttonkqtqgnx.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtkempseXZxdXR0b25rcXRxZ254Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA0MjA1MDIsImV4cCI6MjA4NTk5NjUwMn0.pc_UX8YMPAl4M9fh8W6DilTje8x3ThgsNhblQ33Zt_I";
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 /** ====== CONSTANTS ====== */
@@ -1034,3 +1034,4 @@ async function boot(){
 }
 
 boot();
+
