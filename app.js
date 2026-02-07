@@ -926,6 +926,9 @@ async function refreshAll(reloadMe=false){
 tabs.forEach(t=>{
   t.onclick = async ()=>{
     state.view = t.dataset.view;
+    if (state.view === "friends") { await renderFriendsView(); return; }
+    if (state.view === "chat") { await renderChatView(); return; }
+
     renderTabs();
     await renderPosts();
   };
@@ -1032,6 +1035,418 @@ async function boot(){
   await startPresence();
   await refreshAll();
 }
+async function renderFriendsView(){
+  viewTitle.textContent = "Freunde";
+  viewMeta.textContent = "";
+
+  // 1) Freunde laden
+  const uid = state.session.user.id;
+  const { data: fr, error: e1 } = await supabase
+    .from("friends")
+    .select("low_id, high_id, created_at")
+    .or(`low_id.eq.${uid},high_id.eq.${uid}`);
+
+  if (e1) { postList.innerHTML = `<div class="panel"><div class="muted">${e1.message}</div></div>`; return; }
+
+  const friendIds = (fr||[]).map(x => (x.low_id === uid ? x.high_id : x.low_id));
+
+  let friends = [];
+  if (friendIds.length){
+    const { data: ps } = await supabase.from("profiles").select("id, username, avatar_url, points").in("id", friendIds);
+    friends = ps || [];
+  }
+
+  // 2) Requests laden
+  const { data: req, error: e2 } = await supabase
+    .from("friend_requests")
+    .select("id, sender_id, receiver_id, status, created_at, sender:profiles!friend_requests_sender_id_fkey(username), receiver:profiles!friend_requests_receiver_id_fkey(username)")
+    .or(`sender_id.eq.${uid},receiver_id.eq.${uid}`)
+    .order("created_at", { ascending:false });
+
+  if (e2) { postList.innerHTML = `<div class="panel"><div class="muted">${e2.message}</div></div>`; return; }
+
+  postList.innerHTML = `
+    <div class="panel">
+      <div class="panelHeader">
+        <h3>Freunde</h3>
+        <button class="btn small" id="btnSendReq">+ Freund hinzufügen</button>
+      </div>
+      <div id="friendsList"></div>
+    </div>
+
+    <div class="panel" style="margin-top:12px;">
+      <h3>Anfragen</h3>
+      <div id="reqList"></div>
+      <div class="smallNote">Nur Empfänger kann annehmen/ablehnen.</div>
+    </div>
+  `;
+
+  const friendsList = document.getElementById("friendsList");
+  const reqList = document.getElementById("reqList");
+
+  if (!friends.length){
+    friendsList.innerHTML = `<div class="muted">Noch keine Freunde.</div>`;
+  } else {
+    friends.sort((a,b)=>a.username.localeCompare(b.username));
+    friendsList.innerHTML = friends.map(f=>`
+      <div class="followItem">
+        <div>
+          <div class="followName">${escapeHTML(f.username)}</div>
+          <div class="muted">Rang: ${escapeHTML(rankForPoints(f.points||0))}</div>
+        </div>
+        <button class="miniBtn" data-open-dm="${f.id}">DM</button>
+      </div>
+    `).join("");
+  }
+
+  // Requests render
+  const pending = (req||[]).filter(r=>r.status==="pending");
+  if (!pending.length){
+    reqList.innerHTML = `<div class="muted">Keine offenen Anfragen.</div>`;
+  } else {
+    reqList.innerHTML = pending.map(r=>{
+      const amReceiver = r.receiver_id === uid;
+      const who = amReceiver ? r.sender?.username : r.receiver?.username;
+      return `
+        <div class="followItem">
+          <div>
+            <div class="followName">${escapeHTML(who || "—")}</div>
+            <div class="muted">${amReceiver ? "hat dir eine Anfrage gesendet" : "du hast angefragt"}</div>
+          </div>
+          <div class="row">
+            ${amReceiver ? `<button class="miniBtn" data-accept="${r.id}">Annehmen</button>` : ``}
+            ${amReceiver ? `<button class="miniBtn danger" data-reject="${r.id}">Ablehnen</button>` : `<button class="miniBtn danger" data-cancel="${r.id}">Zurückziehen</button>`}
+          </div>
+        </div>
+      `;
+    }).join("");
+  }
+
+  // send request modal
+  document.getElementById("btnSendReq").onclick = ()=>{
+    const wrap = document.createElement("div");
+    wrap.innerHTML = `
+      <div class="field">
+        <div class="label">Username des Users</div>
+        <input class="input" id="u" placeholder="z.B. SakuraFan" />
+      </div>
+    `;
+    openModal({
+      title: "Freund anfragen",
+      contentNode: wrap,
+      okText: "Anfrage senden",
+      onOk: async ()=>{
+        const name = (wrap.querySelector("#u").value||"").trim();
+        if (!name) return false;
+
+        const { data: target } = await supabase.from("profiles").select("id, username").eq("username", name).maybeSingle();
+        if (!target) { alert("User nicht gefunden."); return false; }
+        if (target.id === uid) { alert("Du kannst dich nicht selbst hinzufügen."); return false; }
+
+        const { error } = await supabase.from("friend_requests").insert({
+          sender_id: uid,
+          receiver_id: target.id
+        });
+        if (error) { alert(error.message); return false; }
+
+        await renderFriendsView();
+        return true;
+      }
+    });
+  };
+
+  // accept/reject/cancel
+  reqList.querySelectorAll("[data-accept]").forEach(b=>{
+    b.onclick = async ()=>{
+      const id = b.getAttribute("data-accept");
+      const { error } = await supabase.rpc("accept_friend_request", { req_id: id });
+      if (error) alert(error.message);
+      await renderFriendsView();
+    };
+  });
+  reqList.querySelectorAll("[data-reject]").forEach(b=>{
+    b.onclick = async ()=>{
+      const id = b.getAttribute("data-reject");
+      const { error } = await supabase.rpc("reject_friend_request", { req_id: id });
+      if (error) alert(error.message);
+      await renderFriendsView();
+    };
+  });
+  reqList.querySelectorAll("[data-cancel]").forEach(b=>{
+    b.onclick = async ()=>{
+      const id = b.getAttribute("data-cancel");
+      await supabase.from("friend_requests").delete().eq("id", id);
+      await renderFriendsView();
+    };
+  });
+
+  // open DM
+  friendsList.querySelectorAll("[data-open-dm]").forEach(b=>{
+    b.onclick = async ()=>{
+      state.view = "chat";
+      state.chatMode = "dm";
+      state.chatPeerId = b.getAttribute("data-open-dm");
+      await renderChatView();
+    };
+  });
+}
+
+async function renderChatView(){
+  viewTitle.textContent = "Chat";
+  viewMeta.textContent = "DM + Gruppen";
+
+  postList.innerHTML = `
+    <div class="panel">
+      <div class="panelHeader">
+        <h3>DMs</h3>
+        <button class="btn small" id="btnPickDm">DM öffnen</button>
+      </div>
+      <div id="dmHint" class="muted">Wähle einen Freund oder öffne DM.</div>
+      <div id="dmBox"></div>
+    </div>
+
+    <div class="panel" style="margin-top:12px;">
+      <div class="panelHeader">
+        <h3>Gruppenräume</h3>
+        <button class="btn small" id="btnNewRoom">+ Raum</button>
+      </div>
+      <div id="rooms"></div>
+      <div id="roomBox" style="margin-top:10px;"></div>
+    </div>
+  `;
+
+  // DM pick modal
+  document.getElementById("btnPickDm").onclick = async ()=>{
+    const uid = state.session.user.id;
+    const { data: fr } = await supabase.from("friends").select("low_id, high_id").or(`low_id.eq.${uid},high_id.eq.${uid}`);
+    const friendIds = (fr||[]).map(x => (x.low_id === uid ? x.high_id : x.low_id));
+    if (!friendIds.length){ alert("Du hast noch keine Freunde."); return; }
+
+    const { data: ps } = await supabase.from("profiles").select("id, username").in("id", friendIds);
+    const wrap = document.createElement("div");
+    wrap.innerHTML = `
+      <div class="field">
+        <div class="label">Freund auswählen</div>
+        <select class="select" id="peer">
+          ${(ps||[]).sort((a,b)=>a.username.localeCompare(b.username)).map(p=>`<option value="${p.id}">${escapeHTML(p.username)}</option>`).join("")}
+        </select>
+      </div>
+    `;
+    openModal({
+      title:"DM öffnen",
+      contentNode: wrap,
+      okText:"Öffnen",
+      onOk: async ()=>{
+        state.chatMode = "dm";
+        state.chatPeerId = wrap.querySelector("#peer").value;
+        await renderDM();
+        return true;
+      }
+    });
+  };
+
+  // Rooms list
+  await renderRooms();
+
+  // If already selected DM from friends view
+  if (state.chatMode === "dm" && state.chatPeerId){
+    await renderDM();
+  }
+}
+
+async function renderDM(){
+  const dmBox = document.getElementById("dmBox");
+  const dmHint = document.getElementById("dmHint");
+  const uid = state.session.user.id;
+  const peer = state.chatPeerId;
+  if (!peer) return;
+
+  const { data: peerP } = await supabase.from("profiles").select("username").eq("id", peer).maybeSingle();
+  dmHint.textContent = `DM mit ${peerP?.username || "—"}`;
+
+  // load messages (last 50)
+  const { data, error } = await supabase
+    .from("dm_messages")
+    .select("id, sender_id, receiver_id, body, created_at")
+    .or(`and(sender_id.eq.${uid},receiver_id.eq.${peer}),and(sender_id.eq.${peer},receiver_id.eq.${uid})`)
+    .order("created_at", { ascending: true })
+    .limit(50);
+
+  if (error){ dmBox.innerHTML = `<div class="muted">${error.message}</div>`; return; }
+
+  dmBox.innerHTML = `
+    <div class="card" style="max-height:260px; overflow:auto;">
+      ${(data||[]).map(m=>{
+        const mine = m.sender_id === uid;
+        return `<div style="margin:8px 0; text-align:${mine?"right":"left"};">
+          <span class="pill">${mine?"Du":"Er/Sie"} • ${fmt(m.created_at)}</span><br/>
+          <span>${escapeHTML(m.body)}</span>
+        </div>`;
+      }).join("")}
+    </div>
+
+    <div class="field" style="margin-top:10px;">
+      <div class="label">Nachricht</div>
+      <input class="input" id="dmText" placeholder="Schreiben…" />
+    </div>
+    <button class="btn primary" id="dmSend">Senden</button>
+  `;
+
+  document.getElementById("dmSend").onclick = async ()=>{
+    const text = (document.getElementById("dmText").value||"").trim();
+    if (!text) return;
+
+    const { error: e } = await supabase.from("dm_messages").insert({
+      sender_id: uid,
+      receiver_id: peer,
+      body: text
+    });
+    if (e) { alert(e.message); return; }
+
+    await renderDM();
+  };
+
+  // Realtime DM refresh (einfach & stabil)
+  if (state.dmChannel) supabase.removeChannel(state.dmChannel);
+  state.dmChannel = supabase.channel(`dm-${uid}-${peer}`);
+  state.dmChannel
+    .on("postgres_changes",
+      { event: "INSERT", schema: "public", table: "dm_messages" },
+      async (payload)=>{
+        const m = payload.new;
+        const ok = (m.sender_id===uid && m.receiver_id===peer) || (m.sender_id===peer && m.receiver_id===uid);
+        if (ok) await renderDM();
+      }
+    )
+    .subscribe();
+}
+
+async function renderRooms(){
+  const rooms = document.getElementById("rooms");
+  const roomBox = document.getElementById("roomBox");
+  const uid = state.session.user.id;
+
+  // rooms where member
+  const { data: mem } = await supabase
+    .from("chat_room_members")
+    .select("room_id, room:chat_rooms(id,name,owner_id)")
+    .eq("user_id", uid);
+
+  const list = (mem||[]).map(x=>x.room).filter(Boolean);
+
+  rooms.innerHTML = list.length ? list.map(r=>`
+    <div class="followItem">
+      <div>
+        <div class="followName">${escapeHTML(r.name)}</div>
+        <div class="muted">${r.owner_id===uid?"Owner":"Mitglied"}</div>
+      </div>
+      <button class="miniBtn" data-open-room="${r.id}">Öffnen</button>
+    </div>
+  `).join("") : `<div class="muted">Du bist in keinen Räumen.</div>`;
+
+  // create room
+  document.getElementById("btnNewRoom").onclick = ()=>{
+    const wrap = document.createElement("div");
+    wrap.innerHTML = `
+      <div class="field">
+        <div class="label">Raumname</div>
+        <input class="input" id="rn" placeholder="z.B. One Piece Theorie" />
+      </div>
+    `;
+    openModal({
+      title:"Neuen Raum erstellen",
+      contentNode: wrap,
+      okText:"Erstellen",
+      onOk: async ()=>{
+        const name = (wrap.querySelector("#rn").value||"").trim();
+        if (!name) return false;
+
+        const { data: room, error } = await supabase
+          .from("chat_rooms")
+          .insert({ name, owner_id: uid })
+          .select("id")
+          .single();
+
+        if (error) { alert(error.message); return false; }
+
+        // owner becomes member
+        await supabase.from("chat_room_members").insert({ room_id: room.id, user_id: uid });
+
+        await renderRooms();
+        return true;
+      }
+    });
+  };
+
+  // open room
+  rooms.querySelectorAll("[data-open-room]").forEach(b=>{
+    b.onclick = async ()=>{
+      const rid = b.getAttribute("data-open-room");
+      await renderRoom(rid);
+    };
+  });
+
+  async function renderRoom(roomId){
+    const { data: info } = await supabase.from("chat_rooms").select("id,name,owner_id").eq("id", roomId).single();
+
+    const { data: msgs, error } = await supabase
+      .from("chat_room_messages")
+      .select("id, room_id, sender_id, body, created_at, sender:profiles(username)")
+      .eq("room_id", roomId)
+      .order("created_at", { ascending:true })
+      .limit(60);
+
+    if (error){ roomBox.innerHTML = `<div class="muted">${error.message}</div>`; return; }
+
+    roomBox.innerHTML = `
+      <div class="card">
+        <div class="cardTop">
+          <div><b>${escapeHTML(info.name)}</b></div>
+          <div class="muted">Raum</div>
+        </div>
+        <div style="max-height:220px; overflow:auto;">
+          ${(msgs||[]).map(m=>`
+            <div style="margin:8px 0;">
+              <span class="pill">${escapeHTML(m.sender?.username || "—")} • ${fmt(m.created_at)}</span><br/>
+              <span>${escapeHTML(m.body)}</span>
+            </div>
+          `).join("")}
+        </div>
+        <div class="field" style="margin-top:10px;">
+          <div class="label">Nachricht</div>
+          <input class="input" id="rmText" placeholder="Schreiben…" />
+        </div>
+        <button class="btn primary" id="rmSend">Senden</button>
+      </div>
+    `;
+
+    document.getElementById("rmSend").onclick = async ()=>{
+      const text = (document.getElementById("rmText").value||"").trim();
+      if (!text) return;
+      const { error: e } = await supabase.from("chat_room_messages").insert({
+        room_id: roomId,
+        sender_id: uid,
+        body: text
+      });
+      if (e){ alert(e.message); return; }
+      await renderRoom(roomId);
+    };
+
+    // Realtime room refresh
+    if (state.roomChannel) supabase.removeChannel(state.roomChannel);
+    state.roomChannel = supabase.channel(`room-${roomId}`);
+    state.roomChannel
+      .on("postgres_changes",
+        { event:"INSERT", schema:"public", table:"chat_room_messages", filter:`room_id=eq.${roomId}` },
+        async ()=>{ await renderRoom(roomId); }
+      )
+      .subscribe();
+  }
+}
+
 
 boot();
+
+
+
 
