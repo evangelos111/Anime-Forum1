@@ -679,6 +679,76 @@ button, .btn, .miniBtn, .tab, .bn, input, select, textarea{
   .grid2{ grid-template-columns: 1fr; }
 }
 
+@media (max-width: 900px){
+
+  /* Content soll nicht an den Rändern kleben */
+  .container, .wrap, .page, main, .content{
+    padding: 10px !important;
+  }
+
+  /* Cards schöner stapeln */
+  .card{
+    margin: 10px 0 !important;
+  }
+
+  /* CardTop nicht zu eng */
+  .cardTop{
+    display:flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .cardTop .row{
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  /* Meta-Pills sollen umbrechen statt rauslaufen */
+  .cardMetaRow{
+    display:flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .pill{
+    max-width: 100%;
+    white-space: nowrap;
+  }
+
+  /* Reply textarea + Button nicer */
+  .replyBox .textarea{
+    min-height: 110px;
+    font-size: 16px;
+  }
+
+  /* Attachments: 1 Spalte auf Handy */
+  .attachGrid{
+    display: grid;
+    grid-template-columns: 1fr !important;
+    gap: 10px;
+  }
+  .attachItem{
+    display:flex;
+    gap: 10px;
+    align-items: center;
+  }
+  .attachImg{
+    width: 88px;
+    height: 88px;
+    object-fit: cover;
+    border-radius: 12px;
+  }
+
+  /* Chatbox / DM / Rooms: höher, besser scrollen */
+  #dmBox .card, #roomBox .card{
+    max-height: none !important;
+  }
+}
+
+@media (max-width: 900px){
+  .tabs, .tabRow{ display:none !important; }
+}
+
+
 
 
 
