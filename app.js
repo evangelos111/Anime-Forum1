@@ -1,33 +1,26 @@
+// app.js (FULL, cleaned, no double-boot, no duplicate state keys)
+// ✅ persist login on mobile (Supabase auth persistSession + localStorage)
+// ✅ one single auth flow (onAuthStateChange is the "source of truth")
+// ✅ friends + dm + rooms hooks included
+// ⚠️ You MUST have these tables in Supabase: friends, friend_requests, dm_messages, chat_rooms, chat_room_members, chat_room_messages
+
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
+// ------------------------------------------------------------
+// 1) SUPABASE INIT
+// ------------------------------------------------------------
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
-    persistSession: true,      // Session speichern
-    autoRefreshToken: true,    // Token automatisch erneuern
-    detectSessionInUrl: true,  // wichtig bei OAuth/magic links
-    storage: localStorage      // explizit localStorage nutzen
-  }
-});
-supabase.auth.onAuthStateChange(async (event, session) => {
-  state.session = session;
-
-  if (!session) {
-    showAuth("Bitte einloggen oder registrieren.");
-    return;
-  }
-
-  // wenn Session neu kommt/refresh
-  await loadMe();
-  hideAuth();
-  renderMe();
-  renderCategoryFilter();
-  await startPresence();
-  await refreshAll(true);
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    storage: localStorage,
+  },
 });
 
-
-
-/** ====== CONSTANTS ====== */
+// ------------------------------------------------------------
+// 2) CONSTANTS / HELPERS
+// ------------------------------------------------------------
 const ANIME_CATEGORIES = [
   "Alle","Shonen","Seinen","Shojo","Josei","Romance","Slice of Life","Action","Fantasy","Isekai",
   "Horror","Comedy","Sports","Mecha","Drama","Mystery","Sci-Fi","News/Infos"
@@ -37,7 +30,7 @@ const QUESTION_TYPES = [
   "— (optional) —","Empfehlung","Diskussion","Hilfe/Frage","Theorie","News","Review/Meinung"
 ];
 
-const el = (id)=>document.getElementById(id);
+const el = (id) => document.getElementById(id);
 
 const escapeHTML = (s)=>String(s ?? "")
   .replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;")
@@ -51,80 +44,99 @@ const parseTags = (input)=>String(input||"")
 
 const fmt = (iso)=> new Date(iso).toLocaleString("de-DE",{dateStyle:"medium",timeStyle:"short"});
 
-/** ====== STATE ====== */
-let state = {
+function lockScroll(lock){
+  document.documentElement.classList.toggle("noScroll", lock);
+  document.body.classList.toggle("noScroll", lock);
+}
+
+function rankForPoints(points){
+  if (points >= 800) return "Anime-Legende";
+  if (points >= 500) return "Otaku-Veteran";
+  if (points >= 300) return "Senpai";
+  if (points >= 160) return "Kenner";
+  if (points >= 80)  return "Mitglied";
+  if (points >= 30)  return "Rookie";
+  return "Novize";
+}
+
+// ------------------------------------------------------------
+// 3) STATE (NO DUPLICATES)
+// ------------------------------------------------------------
+const state = {
   view: "feed",
   mineFilter: "public",
   query: "",
   category: "Alle",
-  me: null,           // profile_rank row
+
   session: null,
+  me: null,
   isAdmin: false,
+
   presenceChannel: null,
   dmChannel: null,
   roomChannel: null,
-  chatMode: null,
-  chatPeerId: null,
-  chatMode: null,   // "dm"
-  chatPeerId: null, //user id
-  dmChannel: null,
-  roomChannel: null 
+
+  chatMode: null,     // "dm" | null
+  chatPeerId: null,   // friend user_id
 };
 
-/** ====== UI NODES ====== */
+// ------------------------------------------------------------
+// 4) UI NODES
+// ------------------------------------------------------------
 const tabs = Array.from(document.querySelectorAll(".tab"));
 const mineSubtabs = el("mineSubtabs");
-const subtabs = ()=>Array.from(document.querySelectorAll(".subtab"));
 
 const btnNewPost = el("btnNewPost");
-const btnLogout = el("btnLogout");
+const btnLogout  = el("btnLogout");
 const btnChangeAvatar = el("btnChangeAvatar");
 const btnAddFollow = el("btnAddFollow");
-const btnAddTopic = el("btnAddTopic");
+const btnAddTopic  = el("btnAddTopic");
 
-const meName = el("meName");
-const meAvatar = el("meAvatar");
-const meRank = el("meRank");
-const mePoints = el("mePoints");
+const meName  = el("meName");
+const meAvatar= el("meAvatar");
+const meRank  = el("meRank");
+const mePoints= el("mePoints");
 const meAdminBadge = el("meAdminBadge");
 
 const search = el("search");
 const filterCategory = el("filterCategory");
 
 const viewTitle = el("viewTitle");
-const viewMeta = el("viewMeta");
-const postList = el("postList");
+const viewMeta  = el("viewMeta");
+const postList  = el("postList");
 
 const onlineCount = el("onlineCount");
-const onlineList = el("onlineList");
+const onlineList  = el("onlineList");
 
 const followList = el("followList");
-const topicList = el("topicList");
+const topicList  = el("topicList");
 
-/** Modal */
+// Modal
 const modal = el("modal");
 const modalTitle = el("modalTitle");
-const modalBody = el("modalBody");
+const modalBody  = el("modalBody");
 const modalClose = el("modalClose");
-const modalCancel = el("modalCancel");
-const modalOk = el("modalOk");
+const modalCancel= el("modalCancel");
+const modalOk    = el("modalOk");
 
-/** Auth overlay */
+// Auth overlay
 const authOverlay = el("authOverlay");
 const authEmail = el("authEmail");
-const authPass = el("authPass");
-const authUser = el("authUser");
-const authMsg = el("authMsg");
-const btnLogin = el("btnLogin");
+const authPass  = el("authPass");
+const authUser  = el("authUser");
+const authMsg   = el("authMsg");
+const btnLogin  = el("btnLogin");
 const btnSignup = el("btnSignup");
 
-/** Mobile Composer */
+// Mobile composer
 const composerSheet = el("composerSheet");
 const openComposerBtn = el("openComposer");
-const closeComposerBtn = el("closeComposer");
-const submitComposerBtn = el("submitComposer");
+const closeComposerBtn= el("closeComposer");
+const submitComposerBtn= el("submitComposer");
 
-/** ====== Modal helper ====== */
+// ------------------------------------------------------------
+// 5) MODAL HELPER
+// ------------------------------------------------------------
 function openModal({ title, contentNode, okText="OK", cancelText="Abbrechen", onOk }) {
   modalTitle.textContent = title;
   modalBody.innerHTML = "";
@@ -153,13 +165,9 @@ function openModal({ title, contentNode, okText="OK", cancelText="Abbrechen", on
   window.onkeydown = (e)=> { if (e.key === "Escape") close(); };
 }
 
-/** ====== Helpers ====== */
-function lockScroll(lock){
-  document.documentElement.classList.toggle("noScroll", lock);
-  document.body.classList.toggle("noScroll", lock);
-}
-
-/** ====== Auth / Profiles ====== */
+// ------------------------------------------------------------
+// 6) AUTH UI
+// ------------------------------------------------------------
 function showAuth(msg=""){
   authMsg.textContent = msg;
   authOverlay.classList.remove("hidden");
@@ -169,12 +177,16 @@ function hideAuth(){
   authMsg.textContent = "";
 }
 
+// ------------------------------------------------------------
+// 7) PROFILE
+// ------------------------------------------------------------
 async function ensureProfile(user, usernameFromSignup){
   const { data: existing, error: e1 } = await supabase
     .from("profiles")
     .select("id, username")
     .eq("id", user.id)
     .maybeSingle();
+
   if (e1) throw e1;
   if (existing) return existing;
 
@@ -200,6 +212,7 @@ async function loadMe(){
     .single();
 
   if (error) throw error;
+
   state.me = data;
   state.isAdmin = data.role === "admin";
   return data;
@@ -214,9 +227,12 @@ function renderMe(){
   meAdminBadge.classList.toggle("hidden", !state.isAdmin);
 }
 
-/** ====== Presence ====== */
+// ------------------------------------------------------------
+// 8) PRESENCE
+// ------------------------------------------------------------
 async function startPresence(){
   if (!state.session?.user) return;
+
   if (state.presenceChannel) {
     supabase.removeChannel(state.presenceChannel);
     state.presenceChannel = null;
@@ -254,6 +270,7 @@ function renderOnline(list){
     const prev = map.get(key);
     if (!prev || (p.at > prev.at)) map.set(key, p);
   }
+
   const arr = Array.from(map.values()).sort((a,b)=> (a.username||"").localeCompare(b.username||""));
 
   onlineCount.textContent = String(arr.length);
@@ -278,17 +295,20 @@ function renderOnline(list){
   }
 }
 
-/** ====== Filters / Tabs ====== */
+// ------------------------------------------------------------
+// 9) TABS / FILTERS
+// ------------------------------------------------------------
 function renderTabs(){
   tabs.forEach(t=>t.classList.toggle("active", t.dataset.view === state.view));
   mineSubtabs.classList.toggle("hidden", state.view !== "mine");
+
   if (state.view === "mine"){
-    subtabs().forEach(s=>s.classList.toggle("active", s.dataset.mine === state.mineFilter));
+    Array.from(document.querySelectorAll(".subtab"))
+      .forEach(s=>s.classList.toggle("active", s.dataset.mine === state.mineFilter));
   }
 }
 
 function renderCategoryFilter(){
-  // Desktop filter
   filterCategory.innerHTML = "";
   ANIME_CATEGORIES.forEach(cat=>{
     const opt = document.createElement("option");
@@ -298,7 +318,6 @@ function renderCategoryFilter(){
   });
   filterCategory.value = state.category;
 
-  // Mobile composer category
   const cCat = el("c_category");
   if (cCat){
     cCat.innerHTML = "";
@@ -310,7 +329,6 @@ function renderCategoryFilter(){
     });
   }
 
-  // Mobile composer qtype
   const cQ = el("c_qtype");
   if (cQ){
     cQ.innerHTML = "";
@@ -323,7 +341,9 @@ function renderCategoryFilter(){
   }
 }
 
-/** ====== Storage Upload ====== */
+// ------------------------------------------------------------
+// 10) STORAGE UPLOAD
+// ------------------------------------------------------------
 async function uploadToAttachmentsBucket(file){
   const userId = state.session.user.id;
   const ext = (file.name.split(".").pop() || "bin").toLowerCase();
@@ -340,12 +360,16 @@ async function uploadToAttachmentsBucket(file){
   return { path, publicUrl: data.publicUrl };
 }
 
-/** ====== Follow Lists ====== */
+// ------------------------------------------------------------
+// 11) FOLLOW LISTS
+// ------------------------------------------------------------
 async function fetchFollowLists(){
+  const uid = state.session.user.id;
+
   const { data: fu, error: e1 } = await supabase
     .from("follows_users")
     .select("followed_id, profiles:followed_id(username)")
-    .eq("follower_id", state.session.user.id);
+    .eq("follower_id", uid);
 
   if (e1) throw e1;
 
@@ -370,7 +394,7 @@ async function fetchFollowLists(){
       btn.onclick = async ()=>{
         const id = btn.getAttribute("data-unfollow");
         await supabase.from("follows_users").delete()
-          .eq("follower_id", state.session.user.id)
+          .eq("follower_id", uid)
           .eq("followed_id", id);
         await fetchFollowLists();
       };
@@ -380,7 +404,7 @@ async function fetchFollowLists(){
   const { data: ft, error: e2 } = await supabase
     .from("follows_tags")
     .select("tag")
-    .eq("follower_id", state.session.user.id);
+    .eq("follower_id", uid);
 
   if (e2) throw e2;
 
@@ -405,7 +429,7 @@ async function fetchFollowLists(){
       btn.onclick = async ()=>{
         const tag = btn.getAttribute("data-untag");
         await supabase.from("follows_tags").delete()
-          .eq("follower_id", state.session.user.id)
+          .eq("follower_id", uid)
           .eq("tag", tag);
         await fetchFollowLists();
       };
@@ -413,15 +437,19 @@ async function fetchFollowLists(){
   }
 }
 
-/** ====== Posts ====== */
+// ------------------------------------------------------------
+// 12) POSTS
+// ------------------------------------------------------------
 function applyClientFilter(posts){
   const q = (state.query || "").toLowerCase();
   const cat = state.category;
 
   let filtered = posts;
+
   if (cat && cat !== "Alle"){
     filtered = filtered.filter(p => (p.category || "") === cat);
   }
+
   if (q){
     filtered = filtered.filter(p => {
       const s = [
@@ -466,7 +494,6 @@ async function fetchPosts(){
       .from("post_attachments")
       .select("id, post_id, author_id, path, file_name, mime_type, size, created_at")
       .in("post_id", ids);
-
     if (ea) throw ea;
     attachments = a || [];
 
@@ -478,7 +505,6 @@ async function fetchPosts(){
       `)
       .in("post_id", ids)
       .order("created_at", { ascending: true });
-
     if (er) throw er;
     replies = r || [];
   }
@@ -499,7 +525,6 @@ async function fetchPosts(){
     });
   }
 
-  // Following filter
   if (state.view === "following"){
     const { data: fu } = await supabase
       .from("follows_users")
@@ -512,7 +537,7 @@ async function fetchPosts(){
       .eq("follower_id", state.session.user.id);
 
     const followedUsers = new Set((fu||[]).map(x=>x.followed_id));
-    const followedTags = new Set((ft||[]).map(x=>x.tag));
+    const followedTags  = new Set((ft||[]).map(x=>x.tag));
 
     return posts.filter(p => {
       if (p.author_id === state.session.user.id) return true;
@@ -532,22 +557,12 @@ async function fetchPosts(){
   }));
 }
 
-/** ====== Render Posts ====== */
-function rankForPoints(points){
-  if (points >= 800) return "Anime-Legende";
-  if (points >= 500) return "Otaku-Veteran";
-  if (points >= 300) return "Senpai";
-  if (points >= 160) return "Kenner";
-  if (points >= 80) return "Mitglied";
-  if (points >= 30) return "Rookie";
-  return "Novize";
-}
-
 function renderAttachmentsHTML(atts, post){
   if (!atts?.length) return "";
   const items = atts.map(a=>{
     const isImg = (a.mime_type || "").startsWith("image/");
     const name = escapeHTML(a.file_name);
+
     const delBtn = (state.isAdmin || post.author_id === state.session.user.id) ? `
       <button class="miniBtn danger" data-del-attach="${a.id}" data-path="${escapeHTML(a.path)}">Löschen</button>
     ` : "";
@@ -566,6 +581,7 @@ function renderAttachmentsHTML(atts, post){
         </div>
       `;
     }
+
     return `
       <div class="attachItem">
         <div class="attachInfo">
@@ -584,9 +600,11 @@ function renderAttachmentsHTML(atts, post){
 
 function renderRepliesHTML(replies){
   if (!replies?.length) return `<div class="muted">Noch keine Antworten.</div>`;
+
   return replies.map(r=>{
     const u = r.author || {};
     const rank = rankForPoints(u.points || 0);
+
     const delBtn = (state.isAdmin || r.author_id === state.session.user.id) ? `
       <button class="miniBtn danger" data-del-reply="${r.id}">Löschen</button>
     ` : "";
@@ -611,13 +629,15 @@ function renderRepliesHTML(replies){
 }
 
 async function renderPosts(){
-  postList.innerHTML = `<div class="panel"><div class="muted">Lade Posts…</div></div>`;
+  postList.innerHTML = `<div class="panel"><div class="muted">Lade…</div></div>`;
+
   const all = await fetchPosts();
   const posts = applyClientFilter(all);
 
-  if (state.view === "feed"){ viewTitle.textContent = "Aktuelle Posts"; }
-  if (state.view === "following"){ viewTitle.textContent = "Gefolgt"; }
-  if (state.view === "mine"){ viewTitle.textContent = "Meine Posts"; }
+  if (state.view === "feed") viewTitle.textContent = "Aktuelle Posts";
+  if (state.view === "following") viewTitle.textContent = "Gefolgt";
+  if (state.view === "mine") viewTitle.textContent = "Meine Posts";
+
   viewMeta.textContent = `${posts.length} Post(s)`;
 
   postList.innerHTML = "";
@@ -671,7 +691,7 @@ async function renderPosts(){
       ${tagsRow}
       ${renderAttachmentsHTML(p.attachments || [], p)}
 
-      <div class="replyBox" id="rb-${p.id}">
+      <div class="replyBox">
         <div class="muted">Antworten:</div>
         <div id="replyList-${p.id}">
           ${renderRepliesHTML(p.replies || [])}
@@ -747,7 +767,9 @@ async function renderPosts(){
   });
 }
 
-/** ====== Create Post / Avatar / Follow Modals ====== */
+// ------------------------------------------------------------
+// 13) CREATE POST / AVATAR / FOLLOW MODALS
+// ------------------------------------------------------------
 function addTopicModal(){
   const wrap = document.createElement("div");
   wrap.innerHTML = `
@@ -796,18 +818,20 @@ function addFollowModal(){
       const { data, error } = await supabase
         .from("profiles")
         .select("id, username")
-        .ilike("username", q)
-        .limit(1);
+        .eq("username", q)
+        .maybeSingle();
 
       if (error) { alert(error.message); return false; }
-      if (!data?.length) { alert("User nicht gefunden."); return false; }
+      if (!data) { alert("User nicht gefunden."); return false; }
 
-      const target = data[0];
-      if (target.id === state.session.user.id) { alert("Du kannst dir nicht selbst folgen."); return false; }
+      if (data.id === state.session.user.id) {
+        alert("Du kannst dir nicht selbst folgen.");
+        return false;
+      }
 
       const { error: e2 } = await supabase.from("follows_users").insert({
         follower_id: state.session.user.id,
-        followed_id: target.id
+        followed_id: data.id
       });
       if (e2) { alert(e2.message); return false; }
 
@@ -840,7 +864,9 @@ function changeAvatarModal(){
       }).eq("id", state.session.user.id);
 
       if (error) { alert(error.message); return false; }
-      await refreshAll(true);
+
+      await loadMe();
+      renderMe();
       return true;
     }
   });
@@ -887,143 +913,32 @@ async function createPostWithUploads({
   return created.id;
 }
 
-function newPostModal(){
-  const wrap = document.createElement("div");
-  const catOptions = ANIME_CATEGORIES.filter(x=>x!=="Alle")
-    .map(c=>`<option value="${c}">${escapeHTML(c)}</option>`).join("");
-  const qOptions = QUESTION_TYPES
-    .map(q=>`<option value="${q}">${escapeHTML(q)}</option>`).join("");
-
-  wrap.innerHTML = `
-    <div class="field">
-      <div class="label">Kategorie (Pflicht)</div>
-      <select class="select" id="pCat">${catOptions}</select>
-    </div>
-
-    <div class="field">
-      <div class="label">Anime-Titel (optional)</div>
-      <input class="input" id="pAnime" placeholder="z.B. One Piece" />
-    </div>
-
-    <div class="field">
-      <div class="label">Tags (optional, Komma)</div>
-      <input class="input" id="pTags" placeholder="naruto, theory, animation" />
-    </div>
-
-    <div class="field">
-      <div class="label">Frage-Typ (optional)</div>
-      <select class="select" id="pQ">${qOptions}</select>
-    </div>
-
-    <div class="field">
-      <div class="label">Spoiler?</div>
-      <div class="row">
-        <label class="pill"><input type="checkbox" id="pSpoiler" /> Ja</label>
-        <input class="input" id="pSpoilerTo" placeholder="bis Episode/Chapter (optional)" style="flex:1; min-width:220px;" />
-      </div>
-    </div>
-
-    <div class="field">
-      <div class="label">Titel (Pflicht)</div>
-      <input class="input" id="pTitle" placeholder="Titel deines Posts…" />
-    </div>
-
-    <div class="field">
-      <div class="label">Nachricht (Pflicht)</div>
-      <textarea class="textarea" id="pBody" placeholder="Was willst du teilen?"></textarea>
-    </div>
-
-    <div class="field">
-      <div class="label">Sichtbarkeit</div>
-      <select class="select" id="pPrivacy">
-        <option value="public">public</option>
-        <option value="friends">friends</option>
-        <option value="private">private</option>
-      </select>
-      <div class="smallNote">friends ist vorbereitet (Freundesystem baust du als nächstes).</div>
-    </div>
-
-    <div class="field">
-      <div class="label">Anhänge (optional)</div>
-      <input class="input" type="file" id="pFiles" multiple />
-      <div class="smallNote">Uploads gehen in Storage, kein localStorage-Limit.</div>
-    </div>
-  `;
-
-  openModal({
-    title:"Post verfassen",
-    contentNode: wrap,
-    okText:"Posten",
-    onOk: async ()=>{
-      const category = wrap.querySelector("#pCat").value;
-      const title = (wrap.querySelector("#pTitle").value || "").trim();
-      const body = (wrap.querySelector("#pBody").value || "").trim();
-      const privacy = wrap.querySelector("#pPrivacy").value;
-
-      if (!category || !title || !body) return false;
-
-      const animeTitle = (wrap.querySelector("#pAnime").value || "").trim();
-      const tags = parseTags(wrap.querySelector("#pTags").value);
-      const questionType = wrap.querySelector("#pQ").value;
-      const spoiler = wrap.querySelector("#pSpoiler").checked;
-      const spoilerTo = (wrap.querySelector("#pSpoilerTo").value || "").trim();
-
-      try {
-        await createPostWithUploads({
-          category,
-          title,
-          body,
-          privacy,
-          animeTitle,
-          tags,
-          questionType,
-          spoiler,
-          spoilerTo,
-          files: wrap.querySelector("#pFiles").files
-        });
-
-        state.view = "mine";
-        state.mineFilter = privacy;
-        await refreshAll(true);
-        return true;
-      } catch (err) {
-        alert(err.message);
-        return false;
-      }
-    }
-  });
-}
-
-/** ====== Refresh ====== */
-async function refreshAll(reloadMe=false){
-  if (reloadMe){
-    await loadMe();
-    renderMe();
-    await startPresence();
-  }
-  await fetchFollowLists();
-  renderTabs();
-  await renderPosts();
-}
-
-/** ====== Friends & Chat ====== */
+// ------------------------------------------------------------
+// 14) FRIENDS + CHAT VIEWS
+// ------------------------------------------------------------
 async function renderFriendsView(){
   viewTitle.textContent = "Freunde";
   viewMeta.textContent = "";
 
   const uid = state.session.user.id;
+
+  postList.innerHTML = `<div class="panel"><div class="muted">Lade…</div></div>`;
+
   const { data: fr, error: e1 } = await supabase
     .from("friends")
     .select("low_id, high_id, created_at")
     .or(`low_id.eq.${uid},high_id.eq.${uid}`);
 
-  if (e1) { postList.innerHTML = `<div class="panel"><div class="muted">${e1.message}</div></div>`; return; }
+  if (e1) { postList.innerHTML = `<div class="panel"><div class="muted">${escapeHTML(e1.message)}</div></div>`; return; }
 
   const friendIds = (fr||[]).map(x => (x.low_id === uid ? x.high_id : x.low_id));
 
   let friends = [];
   if (friendIds.length){
-    const { data: ps } = await supabase.from("profiles").select("id, username, avatar_url, points").in("id", friendIds);
+    const { data: ps } = await supabase
+      .from("profiles")
+      .select("id, username, avatar_url, points")
+      .in("id", friendIds);
     friends = ps || [];
   }
 
@@ -1033,7 +948,7 @@ async function renderFriendsView(){
     .or(`sender_id.eq.${uid},receiver_id.eq.${uid}`)
     .order("created_at", { ascending:false });
 
-  if (e2) { postList.innerHTML = `<div class="panel"><div class="muted">${e2.message}</div></div>`; return; }
+  if (e2) { postList.innerHTML = `<div class="panel"><div class="muted">${escapeHTML(e2.message)}</div></div>`; return; }
 
   postList.innerHTML = `
     <div class="panel">
@@ -1107,7 +1022,12 @@ async function renderFriendsView(){
         const name = (wrap.querySelector("#u").value||"").trim();
         if (!name) return false;
 
-        const { data: target } = await supabase.from("profiles").select("id, username").eq("username", name).maybeSingle();
+        const { data: target } = await supabase
+          .from("profiles")
+          .select("id, username")
+          .eq("username", name)
+          .maybeSingle();
+
         if (!target) { alert("User nicht gefunden."); return false; }
         if (target.id === uid) { alert("Du kannst dich nicht selbst hinzufügen."); return false; }
 
@@ -1131,6 +1051,7 @@ async function renderFriendsView(){
       await renderFriendsView();
     };
   });
+
   reqList.querySelectorAll("[data-reject]").forEach(b=>{
     b.onclick = async ()=>{
       const id = b.getAttribute("data-reject");
@@ -1139,6 +1060,7 @@ async function renderFriendsView(){
       await renderFriendsView();
     };
   });
+
   reqList.querySelectorAll("[data-cancel]").forEach(b=>{
     b.onclick = async ()=>{
       const id = b.getAttribute("data-cancel");
@@ -1183,20 +1105,27 @@ async function renderChatView(){
 
   document.getElementById("btnPickDm").onclick = async ()=>{
     const uid = state.session.user.id;
-    const { data: fr } = await supabase.from("friends").select("low_id, high_id").or(`low_id.eq.${uid},high_id.eq.${uid}`);
+    const { data: fr } = await supabase
+      .from("friends")
+      .select("low_id, high_id")
+      .or(`low_id.eq.${uid},high_id.eq.${uid}`);
+
     const friendIds = (fr||[]).map(x => (x.low_id === uid ? x.high_id : x.low_id));
     if (!friendIds.length){ alert("Du hast noch keine Freunde."); return; }
 
     const { data: ps } = await supabase.from("profiles").select("id, username").in("id", friendIds);
+
     const wrap = document.createElement("div");
     wrap.innerHTML = `
       <div class="field">
         <div class="label">Freund auswählen</div>
         <select class="select" id="peer">
-          ${(ps||[]).sort((a,b)=>a.username.localeCompare(b.username)).map(p=>`<option value="${p.id}">${escapeHTML(p.username)}</option>`).join("")}
+          ${(ps||[]).sort((a,b)=>a.username.localeCompare(b.username))
+            .map(p=>`<option value="${p.id}">${escapeHTML(p.username)}</option>`).join("")}
         </select>
       </div>
     `;
+
     openModal({
       title:"DM öffnen",
       contentNode: wrap,
@@ -1218,9 +1147,10 @@ async function renderChatView(){
 }
 
 async function renderDM(){
-  const dmBox = document.getElementById("dmBox");
+  const dmBox  = document.getElementById("dmBox");
   const dmHint = document.getElementById("dmHint");
-  const uid = state.session.user.id;
+
+  const uid  = state.session.user.id;
   const peer = state.chatPeerId;
   if (!peer) return;
 
@@ -1232,9 +1162,14 @@ async function renderDM(){
     .select("id, sender_id, receiver_id, body, created_at")
     .or(`and(sender_id.eq.${uid},receiver_id.eq.${peer}),and(sender_id.eq.${peer},receiver_id.eq.${uid})`)
     .order("created_at", { ascending: true })
-    .limit(50);
+    .limit(60);
 
-  if (error){ dmBox.innerHTML = `<div class="muted">${error.message}</div>`; return; }
+  if (error){
+    dmBox.innerHTML = `<div class="muted">${escapeHTML(error.message)}<br><br>
+      <b>Hinweis:</b> Die Tabelle <code>dm_messages</code> existiert wahrscheinlich noch nicht.
+    </div>`;
+    return;
+  }
 
   dmBox.innerHTML = `
     <div class="card" style="max-height:260px; overflow:auto;">
@@ -1268,6 +1203,7 @@ async function renderDM(){
     await renderDM();
   };
 
+  // realtime
   if (state.dmChannel) supabase.removeChannel(state.dmChannel);
   state.dmChannel = supabase.channel(`dm-${uid}-${peer}`);
   state.dmChannel
@@ -1283,14 +1219,22 @@ async function renderDM(){
 }
 
 async function renderRooms(){
-  const rooms = document.getElementById("rooms");
+  const rooms   = document.getElementById("rooms");
   const roomBox = document.getElementById("roomBox");
   const uid = state.session.user.id;
 
-  const { data: mem } = await supabase
+  const { data: mem, error } = await supabase
     .from("chat_room_members")
     .select("room_id, room:chat_rooms(id,name,owner_id)")
     .eq("user_id", uid);
+
+  if (error){
+    rooms.innerHTML = `<div class="muted">${escapeHTML(error.message)}<br><br>
+      <b>Hinweis:</b> Tabellen <code>chat_rooms</code>/<code>chat_room_members</code> fehlen evtl.
+    </div>`;
+    roomBox.innerHTML = "";
+    return;
+  }
 
   const list = (mem||[]).map(x=>x.room).filter(Boolean);
 
@@ -1320,15 +1264,19 @@ async function renderRooms(){
         const name = (wrap.querySelector("#rn").value||"").trim();
         if (!name) return false;
 
-        const { data: room, error } = await supabase
+        const { data: room, error: e1 } = await supabase
           .from("chat_rooms")
           .insert({ name, owner_id: uid })
           .select("id")
           .single();
 
-        if (error) { alert(error.message); return false; }
+        if (e1) { alert(e1.message); return false; }
 
-        await supabase.from("chat_room_members").insert({ room_id: room.id, user_id: uid });
+        const { error: e2 } = await supabase
+          .from("chat_room_members")
+          .insert({ room_id: room.id, user_id: uid });
+
+        if (e2) { alert(e2.message); return false; }
 
         await renderRooms();
         return true;
@@ -1344,23 +1292,28 @@ async function renderRooms(){
   });
 
   async function renderRoom(roomId){
-    const { data: info } = await supabase.from("chat_rooms").select("id,name,owner_id").eq("id", roomId).single();
+    const { data: info } = await supabase
+      .from("chat_rooms")
+      .select("id,name,owner_id")
+      .eq("id", roomId)
+      .single();
 
-    const { data: msgs, error } = await supabase
+    const { data: msgs, error: e3 } = await supabase
       .from("chat_room_messages")
       .select("id, room_id, sender_id, body, created_at, sender:profiles(username)")
       .eq("room_id", roomId)
       .order("created_at", { ascending:true })
       .limit(60);
 
-    if (error){ roomBox.innerHTML = `<div class="muted">${error.message}</div>`; return; }
+    if (e3){ roomBox.innerHTML = `<div class="muted">${escapeHTML(e3.message)}</div>`; return; }
 
     roomBox.innerHTML = `
       <div class="card">
         <div class="cardTop">
-          <div><b>${escapeHTML(info.name)}</b></div>
+          <div><b>${escapeHTML(info?.name || "Raum")}</b></div>
           <div class="muted">Raum</div>
         </div>
+
         <div style="max-height:220px; overflow:auto;">
           ${(msgs||[]).map(m=>`
             <div style="margin:8px 0;">
@@ -1369,6 +1322,7 @@ async function renderRooms(){
             </div>
           `).join("")}
         </div>
+
         <div class="field" style="margin-top:10px;">
           <div class="label">Nachricht</div>
           <input class="input" id="rmText" placeholder="Schreiben…" />
@@ -1380,15 +1334,18 @@ async function renderRooms(){
     document.getElementById("rmSend").onclick = async ()=>{
       const text = (document.getElementById("rmText").value||"").trim();
       if (!text) return;
+
       const { error: e } = await supabase.from("chat_room_messages").insert({
         room_id: roomId,
         sender_id: uid,
         body: text
       });
       if (e){ alert(e.message); return; }
+
       await renderRoom(roomId);
     };
 
+    // realtime
     if (state.roomChannel) supabase.removeChannel(state.roomChannel);
     state.roomChannel = supabase.channel(`room-${roomId}`);
     state.roomChannel
@@ -1400,19 +1357,44 @@ async function renderRooms(){
   }
 }
 
-/** ====== Events ====== */
-tabs.forEach(t=>{
-  t.onclick = async ()=>{
-    state.view = t.dataset.view;
-    if (state.view === "friends") { await renderFriendsView(); return; }
-    if (state.view === "chat") { await renderChatView(); return; }
+// ------------------------------------------------------------
+// 15) VIEW ROUTING
+// ------------------------------------------------------------
+async function setView(view){
+  state.view = view;
+  renderTabs();
 
-    renderTabs();
-    await renderPosts();
-  };
+  if (view === "friends") return renderFriendsView();
+  if (view === "chat")    return renderChatView();
+
+  return renderPosts();
+}
+
+// ------------------------------------------------------------
+// 16) REFRESH
+// ------------------------------------------------------------
+async function refreshAll(reloadMe=false){
+  if (reloadMe){
+    await loadMe();
+    renderMe();
+    await startPresence();
+  }
+  await fetchFollowLists();
+  renderTabs();
+
+  if (state.view === "friends") return renderFriendsView();
+  if (state.view === "chat")    return renderChatView();
+  return renderPosts();
+}
+
+// ------------------------------------------------------------
+// 17) EVENTS
+// ------------------------------------------------------------
+tabs.forEach(t=>{
+  t.onclick = async ()=> setView(t.dataset.view);
 });
 
-subtabs().forEach(s=>{
+Array.from(document.querySelectorAll(".subtab")).forEach(s=>{
   s.onclick = async ()=>{
     state.mineFilter = s.dataset.mine;
     renderTabs();
@@ -1430,7 +1412,10 @@ btnNewPost.onclick = () => {
     lockScroll(true);
     setTimeout(() => el("c_body")?.focus(), 80);
   } else {
-    newPostModal();
+    // Desktop: reuse sheet-style modal for simplicity
+    composerSheet.hidden = false;
+    lockScroll(true);
+    setTimeout(() => el("c_body")?.focus(), 80);
   }
 };
 
@@ -1440,25 +1425,21 @@ btnAddTopic.onclick = addTopicModal;
 
 btnLogout.onclick = async ()=>{
   await supabase.auth.signOut();
+  // cleanup channels
+  if (state.presenceChannel) supabase.removeChannel(state.presenceChannel);
+  if (state.dmChannel) supabase.removeChannel(state.dmChannel);
+  if (state.roomChannel) supabase.removeChannel(state.roomChannel);
   location.reload();
 };
 
-/** ====== Mobile BottomNav ====== */
+// Mobile BottomNav
 document.querySelectorAll(".bottomNav .bn").forEach(btn => {
   btn.addEventListener("click", async () => {
-    const view = btn.dataset.view;
-    const tab = document.querySelector(`.tab[data-view="${view}"]`);
-    if (tab) { tab.click(); return; }
-
-    state.view = view;
-    if (view === "friends") { await renderFriendsView(); return; }
-    if (view === "chat") { await renderChatView(); return; }
-    renderTabs();
-    await renderPosts();
+    await setView(btn.dataset.view);
   });
 });
 
-/** ====== Mobile Composer ====== */
+// Mobile Composer
 openComposerBtn?.addEventListener("click", () => {
   composerSheet.hidden = false;
   lockScroll(true);
@@ -1506,31 +1487,25 @@ submitComposerBtn?.addEventListener("click", async () => {
     await refreshAll(true);
 
     if (el("c_title")) el("c_title").value = "";
-    if (el("c_body")) el("c_body").value = "";
+    if (el("c_body"))  el("c_body").value = "";
     if (el("c_anime")) el("c_anime").value = "";
-    if (el("c_tags")) el("c_tags").value = "";
-    if (el("c_file")) el("c_file").value = "";
+    if (el("c_tags"))  el("c_tags").value = "";
+    if (el("c_file"))  el("c_file").value = "";
 
   } catch (err) {
     alert(err.message);
   }
 });
 
-/** ====== Auth overlay actions ====== */
+// Auth actions
 btnLogin.onclick = async ()=>{
   authMsg.textContent = "Logge ein…";
   try{
     const email = authEmail.value.trim();
     const password = authPass.value;
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
-    state.session = data.session;
-    await loadMe();
-    hideAuth();
-    renderMe();
-    renderCategoryFilter();
-    await startPresence();
-    await refreshAll();
+    // onAuthStateChange übernimmt ab hier
   }catch(err){
     authMsg.textContent = err.message;
   }
@@ -1547,24 +1522,63 @@ btnSignup.onclick = async ()=>{
     const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) throw error;
 
+    // direkt einloggen (damit wir Profil schreiben können)
     const { data: si, error: e2 } = await supabase.auth.signInWithPassword({ email, password });
     if (e2) throw e2;
 
-    state.session = si.session;
     await ensureProfile(si.session.user, username);
-    await loadMe();
-
-    hideAuth();
-    renderMe();
-    renderCategoryFilter();
-    await startPresence();
-    await refreshAll(true);
+    // onAuthStateChange übernimmt ab hier
   }catch(err){
     authMsg.textContent = err.message;
   }
 };
 
-/** ====== Boot ====== */
+// ------------------------------------------------------------
+// 18) SINGLE SOURCE OF TRUTH: AUTH STATE CHANGE
+// ------------------------------------------------------------
+supabase.auth.onAuthStateChange(async (_event, session) => {
+  state.session = session;
+
+  // logged out
+  if (!session){
+    state.me = null;
+    state.isAdmin = false;
+
+    // cleanup channels
+    if (state.presenceChannel) supabase.removeChannel(state.presenceChannel);
+    if (state.dmChannel) supabase.removeChannel(state.dmChannel);
+    if (state.roomChannel) supabase.removeChannel(state.roomChannel);
+
+    showAuth("Bitte einloggen oder registrieren.");
+    return;
+  }
+
+  // logged in
+  try{
+    // make sure profile exists (if missing username -> force signup UI)
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user){
+      try { await ensureProfile(user, ""); }
+      catch { showAuth("Bitte registrieren (Username fehlt)."); return; }
+    }
+
+    hideAuth();
+    renderCategoryFilter();
+    await loadMe();
+    renderMe();
+    await startPresence();
+
+    // first render
+    await refreshAll(false);
+
+  }catch(err){
+    showAuth(err.message);
+  }
+});
+
+// ------------------------------------------------------------
+// 19) BOOT (ONLY GET SESSION ONCE)
+// ------------------------------------------------------------
 async function boot(){
   renderCategoryFilter();
 
@@ -1576,24 +1590,18 @@ async function boot(){
     return;
   }
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (user){
-    try{
-      await ensureProfile(user, "");
-    }catch{
-      showAuth("Bitte registrieren (Username fehlt).");
-      return;
-    }
+  // if already logged in, onAuthStateChange will run immediately in many cases,
+  // but to be safe, force a light refresh here:
+  try{
+    hideAuth();
+    await loadMe();
+    renderMe();
+    renderTabs();
+    await startPresence();
+    await refreshAll(false);
+  }catch(err){
+    showAuth(err.message);
   }
-
-  await loadMe();
-  renderMe();
-  renderTabs();
-  await startPresence();
-  await refreshAll();
 }
 
 boot();
-
-
-
