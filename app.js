@@ -1591,12 +1591,31 @@ if (submitComposerBtn) {
   });
 }
 
+function lockScroll(lock){
+  document.documentElement.classList.toggle("noScroll", lock);
+  document.body.classList.toggle("noScroll", lock);
+}
+
+openComposerBtn?.addEventListener("click", () => {
+  composerSheet.hidden = false;
+  lockScroll(true);
+  setTimeout(() => document.getElementById("c_body")?.focus(), 80);
+});
+
+closeComposerBtn?.addEventListener("click", () => {
+  composerSheet.hidden = true;
+  lockScroll(false);
+});
+composerSheet.hidden = true;
+lockScroll(false);
+
 
 // ===== Mobile: Keyboard-Friendly Scroll =====
 
 
 
 boot();
+
 
 
 
