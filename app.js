@@ -43,6 +43,10 @@ let state = {
   roomChannel: null,
   chatMode: null,
   chatPeerId: null,
+  chatMode: null,   // "dm"
+  chatPeerId: null, //user id
+  dmChannel: null,
+  roomChannel: null 
 };
 
 /** ====== UI NODES ====== */
@@ -1568,3 +1572,4 @@ async function boot(){
 }
 
 boot();
+
