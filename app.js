@@ -788,6 +788,47 @@ function changeAvatarModal(){
     }
   });
 }
+async function createPostWithUploads({
+  category, title, body, privacy,
+  animeTitle, tags, questionType,
+  spoiler, spoilerTo,
+  files
+}) {
+  const { data: created, error: ep } = await supabase.from("posts")
+    .insert({
+      author_id: state.session.user.id,
+      title,
+      body,
+      privacy,
+      category,
+      anime_title: animeTitle || null,
+      question_type: (questionType && questionType !== "— (optional) —") ? questionType : null,
+      spoiler: !!spoiler,
+      spoiler_to: spoilerTo || null,
+      tags: tags || []
+    })
+    .select("id")
+    .single();
+
+  if (ep) throw ep;
+
+  const arr = Array.from(files || []);
+  for (const f of arr) {
+    const up = await uploadToAttachmentsBucket(f);
+    const { error: ea } = await supabase.from("post_attachments").insert({
+      post_id: created.id,
+      author_id: state.session.user.id,
+      path: up.path,
+      file_name: f.name,
+      mime_type: f.type || null,
+      size: f.size
+    });
+    if (ea) throw ea;
+  }
+
+  return created.id;
+}
+
 
 function newPostModal(){
   const wrap = document.createElement("div");
@@ -869,23 +910,29 @@ function newPostModal(){
       const spoilerTo = (wrap.querySelector("#pSpoilerTo").value || "").trim();
 
       // 1) create post row
-      const { data: created, error: ep } = await supabase.from("posts")
-        .insert({
-          author_id: state.session.user.id,
-          title,
-          body,
-          privacy,
-          category,
-          anime_title: animeTitle || null,
-          question_type: (questionType && questionType !== "— (optional) —") ? questionType : null,
-          spoiler,
-          spoiler_to: spoilerTo || null,
-          tags
-        })
-        .select("id")
-        .single();
+      try {
+  const postId = await createPostWithUploads({
+    category,
+    title,
+    body,
+    privacy,
+    animeTitle,
+    tags,
+    questionType,
+    spoiler,
+    spoilerTo,
+    files: wrap.querySelector("#pFiles").files
+  });
 
-      if (ep) { alert(ep.message); return false; }
+  state.view = "mine";
+  state.mineFilter = privacy;
+  await refreshAll(true);
+  return true;
+} catch (err) {
+  alert(err.message);
+  return false;
+}
+
 
       // 2) upload files + insert attachment rows
       const files = Array.from(wrap.querySelector("#pFiles").files || []);
@@ -1504,27 +1551,54 @@ if (closeComposerBtn && composerSheet) {
 // Beispiel: createPostFromComposer(); -> musst du an deinen Code anpassen.
 if (submitComposerBtn) {
   submitComposerBtn.addEventListener("click", async () => {
-    // Minimal-Validierung
-    const body = (document.getElementById("c_body")?.value || "").trim();
-    if (!body) { alert("Nachricht ist Pflicht."); return; }
+    try {
+      const category = document.getElementById("c_category")?.value || "Allgemein";
+      const privacy  = document.getElementById("c_privacy")?.value || "public";
 
-    // TODO: hier musst du an deine bestehende Post-Create Funktion andocken
-    // Beispiel (du passt die Funktionsnamen an):
-    // await createPost({
-    //   title: document.getElementById("c_title").value,
-    //   body,
-    //   category: document.getElementById("c_category").value,
-    //   privacy: document.getElementById("c_privacy").value,
-    //   anime_title: document.getElementById("c_anime").value,
-    //   question_type: document.getElementById("c_qtype").value,
-    //   spoiler: document.getElementById("c_spoiler").value === "true",
-    //   tags: (document.getElementById("c_tags").value||"").split(",").map(s=>s.trim()).filter(Boolean),
-    //   file: document.getElementById("c_file").files?.[0] || null
-    // });
+      const title = (document.getElementById("c_title")?.value || "").trim();
+      const body  = (document.getElementById("c_body")?.value  || "").trim();
+      if (!body) { alert("Nachricht ist Pflicht."); return; }
 
-    alert("Composer ist drin – jetzt muss ich ihn mit deiner Post-Funktion verbinden.");
+      const animeTitle = (document.getElementById("c_anime")?.value || "").trim();
+      const questionType = document.getElementById("c_qtype")?.value || null;
+      const spoiler = (document.getElementById("c_spoiler")?.value === "true");
+      const tags = parseTags(document.getElementById("c_tags")?.value || "");
+
+      // Datei: dein Handy-Composer hat i.d.R. nur 1 File Input
+      const files = document.getElementById("c_file")?.files || [];
+
+      await createPostWithUploads({
+        category,
+        title: title || "(ohne Titel)",
+        body,
+        privacy,
+        animeTitle,
+        tags,
+        questionType,
+        spoiler,
+        spoilerTo: null,
+        files
+      });
+
+      // schließen + feed neu laden
+      if (composerSheet) composerSheet.hidden = true;
+      state.view = "mine";
+      state.mineFilter = privacy;
+      await refreshAll(true);
+
+      // Felder leeren
+      if (document.getElementById("c_title")) document.getElementById("c_title").value = "";
+      if (document.getElementById("c_body")) document.getElementById("c_body").value = "";
+      if (document.getElementById("c_anime")) document.getElementById("c_anime").value = "";
+      if (document.getElementById("c_tags")) document.getElementById("c_tags").value = "";
+      if (document.getElementById("c_file")) document.getElementById("c_file").value = "";
+
+    } catch (err) {
+      alert(err.message);
+    }
   });
 }
+
 
 // ===== Mobile: Keyboard-Friendly Scroll =====
 document.addEventListener("focusin", (e) => {
@@ -1536,6 +1610,7 @@ document.addEventListener("focusin", (e) => {
 
 
 boot();
+
 
 
 
