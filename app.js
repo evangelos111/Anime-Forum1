@@ -981,13 +981,13 @@ tabs.forEach(t=>{
   };
 });
 
-document.addEventListener("click", (e)=>{
-  const st = e.target.closest(".subtab");
-  if (!st) return;
-  state.mineFilter = st.dataset.mine;
-  renderTabs();
-  renderPosts();
+document.addEventListener("focusin", (e) => {
+  const x = e.target;
+  if (x && (x.tagName === "INPUT" || x.tagName === "TEXTAREA" || x.tagName === "SELECT")) {
+    setTimeout(() => x.scrollIntoView({ block: "center", behavior: "smooth" }), 150);
+  }
 });
+
 
 search.oninput = ()=>{ state.query = search.value || ""; renderPosts(); };
 filterCategory.onchange = ()=>{ state.category = filterCategory.value || "Alle"; renderPosts(); };
@@ -1501,41 +1501,23 @@ async function renderRooms(){
 }
 // BottomNav -> triggert die gleichen Klicks wie deine Tabs (falls vorhanden)
 // Fällt zurück auf state.view + refreshAll() wenn du das hast.
-document.querySelectorAll(".bottomNav .bn").forEach(btn => {
-  btn.addEventListener("click", async () => {
-    const view = btn.dataset.view;
 
-    // 1) Wenn es oben Tabs mit data-view gibt: klicke die automatisch
-    const tab = document.querySelector(`.tab[data-view="${view}"]`);
-    if (tab) { tab.click(); return; }
-
-    // 2) Fallback: wenn du state.view + refreshAll nutzt
-    if (window.state) state.view = view;
-    if (typeof refreshAll === "function") await refreshAll();
-  });
-});
-// Mobile fix: beim Tippen das Feld in die Mitte scrollen (Keyboard-Friendly)
-document.addEventListener("focusin", (e) => {
-  const el = e.target;
-  if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT")) {
-    setTimeout(() => el.scrollIntoView({ block: "center", behavior: "smooth" }), 150);
-  }
-});
 
 // ===== Mobile: BottomNav klickt Views an (nutzt Tabs, falls vorhanden) =====
 document.querySelectorAll(".bottomNav .bn").forEach(btn => {
   btn.addEventListener("click", async () => {
     const view = btn.dataset.view;
-
-    // wenn oben Tabs existieren, nutze sie
     const tab = document.querySelector(`.tab[data-view="${view}"]`);
     if (tab) { tab.click(); return; }
 
-    // fallback wenn du state + refreshAll hast
-    if (window.state) state.view = view;
-    if (typeof refreshAll === "function") await refreshAll();
+    state.view = view;
+    if (view === "friends") { await renderFriendsView(); return; }
+    if (view === "chat") { await renderChatView(); return; }
+    renderTabs();
+    await renderPosts();
   });
 });
+
 
 // ===== Mobile: Composer Sheet =====
 const composerSheet = document.getElementById("composerSheet");
@@ -1610,15 +1592,11 @@ if (submitComposerBtn) {
 
 
 // ===== Mobile: Keyboard-Friendly Scroll =====
-document.addEventListener("focusin", (e) => {
-  const el = e.target;
-  if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT")) {
-    setTimeout(() => el.scrollIntoView({ block: "center", behavior: "smooth" }), 150);
-  }
-});
+
 
 
 boot();
+
 
 
 
