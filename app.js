@@ -895,43 +895,44 @@ function newPostModal(){
     title:"Post verfassen",
     contentNode: wrap,
     okText:"Posten",
-    onOk: async ()=>{
-      const category = wrap.querySelector("#pCat").value;
-      const title = (wrap.querySelector("#pTitle").value || "").trim();
-      const body = (wrap.querySelector("#pBody").value || "").trim();
-      const privacy = wrap.querySelector("#pPrivacy").value;
+onOk: async ()=> {
+  const category = wrap.querySelector("#pCat").value;
+  const title = (wrap.querySelector("#pTitle").value || "").trim();
+  const body = (wrap.querySelector("#pBody").value || "").trim();
+  const privacy = wrap.querySelector("#pPrivacy").value;
 
-      if (!category || !title || !body) return false;
+  if (!category || !title || !body) return false;
 
-      const animeTitle = (wrap.querySelector("#pAnime").value || "").trim();
-      const tags = parseTags(wrap.querySelector("#pTags").value);
-      const questionType = wrap.querySelector("#pQ").value;
-      const spoiler = wrap.querySelector("#pSpoiler").checked;
-      const spoilerTo = (wrap.querySelector("#pSpoilerTo").value || "").trim();
+  const animeTitle = (wrap.querySelector("#pAnime").value || "").trim();
+  const tags = parseTags(wrap.querySelector("#pTags").value);
+  const questionType = wrap.querySelector("#pQ").value;
+  const spoiler = wrap.querySelector("#pSpoiler").checked;
+  const spoilerTo = (wrap.querySelector("#pSpoilerTo").value || "").trim();
 
-      // 1) create post row
-      try {
-  const postId = await createPostWithUploads({
-    category,
-    title,
-    body,
-    privacy,
-    animeTitle,
-    tags,
-    questionType,
-    spoiler,
-    spoilerTo,
-    files: wrap.querySelector("#pFiles").files
-  });
+  try {
+    await createPostWithUploads({
+      category,
+      title,
+      body,
+      privacy,
+      animeTitle,
+      tags,
+      questionType,
+      spoiler,
+      spoilerTo,
+      files: wrap.querySelector("#pFiles").files
+    });
 
-  state.view = "mine";
-  state.mineFilter = privacy;
-  await refreshAll(true);
-  return true;
-} catch (err) {
-  alert(err.message);
-  return false;
+    state.view = "mine";
+    state.mineFilter = privacy;
+    await refreshAll(true);
+    return true;
+  } catch (err) {
+    alert(err.message);
+    return false;
+  }
 }
+
 
 
       // 2) upload files + insert attachment rows
@@ -1596,6 +1597,7 @@ if (submitComposerBtn) {
 
 
 boot();
+
 
 
 
