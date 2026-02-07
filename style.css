@@ -347,3 +347,143 @@ select option{
   box-shadow: var(--shadow);
   padding:16px;
 }
+/* =========================
+   MOBILE / RESPONSIVE MODE
+   ========================= */
+
+.bottomNav{
+  display:none;
+}
+
+/* Touch-friendly defaults */
+button, .btn, .miniBtn, .tab, .bn, input, select, textarea{
+  touch-action: manipulation;
+}
+
+/* Mobile breakpoint */
+@media (max-width: 900px){
+
+  /* Gesamtes Layout: nur eine Spalte */
+  .layout,
+  .appLayout,
+  .grid,
+  main{
+    display:block !important;
+  }
+
+  /* Container soll nicht gequetscht wirken */
+  .container,
+  .wrap,
+  .page,
+  .app{
+    width: 100%;
+    padding: 12px;
+  }
+
+  /* Header kompakt */
+  header, .topbar, .header{
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    backdrop-filter: blur(10px);
+  }
+
+  /* Seitenleisten ausblenden (links/rechts) */
+  .sidebar,
+  .leftCol,
+  .rightCol,
+  aside{
+    display:none !important;
+  }
+
+  /* Hauptcontent auf volle Breite */
+  .content,
+  .main,
+  .centerCol,
+  .feed{
+    width:100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Karten / Posts: mehr Luft + bessere Lesbarkeit */
+  .card, .panel, .post, .box{
+    border-radius: 16px;
+    padding: 12px;
+  }
+
+  /* Inputs: groß genug für Finger */
+  .input, input, textarea, select, .select{
+    width: 100%;
+    min-height: 44px;
+    font-size: 16px; /* verhindert iOS zoom */
+  }
+
+  /* Buttons: finger-friendly */
+  .btn, button, .miniBtn{
+    min-height: 44px;
+    padding: 10px 12px;
+    border-radius: 12px;
+  }
+
+  /* Obere Tabs (falls vorhanden) nicht zu breit */
+  .tabs, .tabRow{
+    overflow-x:auto;
+    -webkit-overflow-scrolling: touch;
+    gap: 8px;
+  }
+  .tab{
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  /* Platz für BottomNav */
+  body{
+    padding-bottom: 74px;
+  }
+
+  /* Bottom Navigation */
+  .bottomNav{
+    display:flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 50;
+    gap: 8px;
+    padding: 10px 10px;
+    border-top: 1px solid var(--line);
+    background: rgba(17,24,39,.92);
+    backdrop-filter: blur(12px);
+  }
+
+  .bottomNav .bn{
+    flex: 1;
+    border: 1px solid var(--line);
+    background: rgba(255,255,255,.05);
+    color: var(--text);
+    border-radius: 14px;
+    font-weight: 600;
+  }
+
+  /* Modals: auf Handy fullscreen */
+  .modal,
+  .dialog,
+  .modalContent{
+    width: calc(100vw - 20px);
+    max-width: 520px;
+  }
+}
+
+/* Extra small phones */
+@media (max-width: 420px){
+  .bottomNav{
+    gap: 6px;
+    padding: 8px;
+  }
+  .bottomNav .bn{
+    font-size: 13px;
+    padding: 10px 8px;
+  }
+}
+
+
