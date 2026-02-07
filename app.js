@@ -8,6 +8,23 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     storage: localStorage      // explizit localStorage nutzen
   }
 });
+supabase.auth.onAuthStateChange(async (event, session) => {
+  state.session = session;
+
+  if (!session) {
+    showAuth("Bitte einloggen oder registrieren.");
+    return;
+  }
+
+  // wenn Session neu kommt/refresh
+  await loadMe();
+  hideAuth();
+  renderMe();
+  renderCategoryFilter();
+  await startPresence();
+  await refreshAll(true);
+});
+
 
 
 /** ====== CONSTANTS ====== */
@@ -1577,5 +1594,6 @@ async function boot(){
 }
 
 boot();
+
 
 
