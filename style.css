@@ -25,7 +25,7 @@ body{
     var(--bg);
 }
 
-.hidden{display:none !important}
+.hidden{ display:none !important; }
 
 /* Topbar */
 .topbar{
@@ -143,7 +143,7 @@ h3{margin:0; font-size:16px}
 .miniBtn.danger{ border-color: rgba(239,68,68,.45); background: rgba(239,68,68,.10); }
 .miniBtn:hover{border-color: rgba(96,165,250,.45)}
 
-/* Inputs (Dark Dropdown Fix) */
+/* Inputs */
 .input, .textarea, .select{
   width:100%;
   background: rgba(10,14,22,.75);
@@ -347,241 +347,45 @@ select option{
   box-shadow: var(--shadow);
   padding:16px;
 }
-/* =========================
-   MOBILE / RESPONSIVE MODE
-   ========================= */
 
-.bottomNav{
-  display:none;
-}
-
-/* Touch-friendly defaults */
-button, .btn, .miniBtn, .tab, .bn, input, select, textarea{
-  touch-action: manipulation;
-}
-
-/* Mobile breakpoint */
-@media (max-width: 900px){
-
-  /* Gesamtes Layout: nur eine Spalte */
-  .layout,
-  .appLayout,
-  .grid,
-  main{
-    display:block !important;
-  }
-
-  /* Container soll nicht gequetscht wirken */
-  .container,
-  .wrap,
-  .page,
-  .app{
-    width: 100%;
-    padding: 12px;
-  }
-
-  /* Header kompakt */
-  header, .topbar, .header{
-    position: sticky;
-    top: 0;
-    z-index: 20;
-    backdrop-filter: blur(10px);
-  }
-
-  /* Seitenleisten ausblenden (links/rechts) */
-  .sidebar,
-  .leftCol,
-  .rightCol,
-  aside{
-    display:none !important;
-  }
-
-  /* Hauptcontent auf volle Breite */
-  .content,
-  .main,
-  .centerCol,
-  .feed{
-    width:100% !important;
-    max-width: 100% !important;
-  }
-
-  /* Karten / Posts: mehr Luft + bessere Lesbarkeit */
-  .card, .panel, .post, .box{
-    border-radius: 16px;
-    padding: 12px;
-  }
-
-  /* Inputs: groß genug für Finger */
-  .input, input, textarea, select, .select{
-    width: 100%;
-    min-height: 44px;
-    font-size: 16px; /* verhindert iOS zoom */
-  }
-
-  /* Buttons: finger-friendly */
-  .btn, button, .miniBtn{
-    min-height: 44px;
-    padding: 10px 12px;
-    border-radius: 12px;
-  }
-
-  /* Obere Tabs (falls vorhanden) nicht zu breit */
-  .tabs, .tabRow{
-    overflow-x:auto;
-    -webkit-overflow-scrolling: touch;
-    gap: 8px;
-  }
-  .tab{
-    flex: 0 0 auto;
-    white-space: nowrap;
-  }
-
-  /* Platz für BottomNav */
-  body{
-    padding-bottom: 74px;
-  }
-
-  /* Bottom Navigation */
-  .bottomNav{
-    display:flex;
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 50;
-    gap: 8px;
-    padding: 10px 10px;
-    border-top: 1px solid var(--line);
-    background: rgba(17,24,39,.92);
-    backdrop-filter: blur(12px);
-  }
-
-  .bottomNav .bn{
-    flex: 1;
-    border: 1px solid var(--line);
-    background: rgba(255,255,255,.05);
-    color: var(--text);
-    border-radius: 14px;
-    font-weight: 600;
-  }
-
-  /* Modals: auf Handy fullscreen */
-  .modal,
-  .dialog,
-  .modalContent{
-    width: calc(100vw - 20px);
-    max-width: 520px;
-  }
-}
-
-/* Extra small phones */
-@media (max-width: 420px){
-  .bottomNav{
-    gap: 6px;
-    padding: 8px;
-  }
-  .bottomNav .bn{
-    font-size: 13px;
-    padding: 10px 8px;
-  }
-}
-
-/* ===== Mobile: Post Composer easier ===== */
-@media (max-width: 900px){
-
-  /* wenn dein Post-Form in einer Card/Panel ist */
-  .composer, .postComposer, .createPost, .newPostPanel{
-    border-radius: 16px;
-  }
-
-  /* Fullscreen Modal Styling (falls du schon modals hast) */
-  .modal.fullscreen .modalContent,
-  .modal.fullscreen .dialog,
-  .modal.fullscreen .content{
-    width: 100vw;
-    max-width: 100vw;
-    height: 100dvh;
-    max-height: 100dvh;
-    border-radius: 0;
-    padding: 12px;
-    overflow: hidden;
-  }
-
-  .composerBody{
-    height: calc(100dvh - 120px);
-    overflow: auto;
-    -webkit-overflow-scrolling: touch;
-    padding-bottom: 18px;
-  }
-
-  .composerActions{
-    position: sticky;
-    bottom: 0;
-    display: flex;
-    gap: 10px;
-    padding: 10px 0 8px;
-    border-top: 1px solid var(--line);
-    background: rgba(17,24,39,.92);
-    backdrop-filter: blur(12px);
-  }
-  .composerActions .btn{
-    flex: 1;
-    min-height: 48px;
-    border-radius: 14px;
-  }
-
-  /* Inputs noch angenehmer */
-  textarea{
-    min-height: 140px;
-    resize: vertical;
-  }
-
-  /* Optional block (anime details) collapsible look */
-  details.composerDetails{
-    border: 1px solid var(--line);
-    border-radius: 14px;
-    padding: 8px 10px;
-    background: rgba(255,255,255,.04);
-  }
-  details.composerDetails summary{
-    cursor: pointer;
-    font-weight: 700;
-    padding: 8px 0;
-  }
-
-  /* File input nicer */
-  input[type="file"]{
-    width: 100%;
-  }
-}
-/* ===== Mobile App UI ===== */
-
+/* ===== Mobile UI elements (default hidden on desktop) ===== */
 .bottomNav{ display:none; }
 .fab{ display:none; }
 .sheet{ display:none; }
 
+/* noScroll helper for composer */
+.noScroll{
+  overflow: hidden !important;
+  height: 100% !important;
+}
+
+/* ===== MOBILE (einziger Block, ganz unten) ===== */
 @media (max-width: 900px){
 
-  /* 1 Spalte, keine Sidebars */
-  .sidebar, aside, .leftCol, .rightCol{ display:none !important; }
-  .content, main, .centerCol, .feed{ width:100% !important; max-width:100% !important; }
+  /* 1) Sidebars weg */
+  .page > aside.side{ display:none !important; }
 
-  /* Platz für BottomNav */
+  /* 2) Top Tabs weg, BottomNav an */
+  .tabs{ display:none !important; }
+
+  /* 3) Full width layout */
+  .page{
+    grid-template-columns: 1fr !important;
+    padding: 12px !important;
+  }
+
+  /* 4) Platz für BottomNav */
   body{ padding-bottom: 78px; }
 
-  /* große Touch-Ziele */
-  .btn, button, .tab, .miniBtn{
-    min-height: 44px;
-    padding: 10px 12px;
-    border-radius: 14px;
-  }
-  input, textarea, select, .input, .select{
+  /* 5) Touch-friendly */
+  input, textarea, select, .input, .select,
+  button, .btn, .miniBtn, .tab, .bn{
     min-height: 44px;
     font-size: 16px; /* verhindert iOS zoom */
     border-radius: 14px;
   }
 
-  /* Bottom Navigation */
+  /* 6) Bottom Navigation */
   .bottomNav{
     display:flex;
     position: fixed;
@@ -599,10 +403,10 @@ button, .btn, .miniBtn, .tab, .bn, input, select, textarea{
     background: rgba(255,255,255,.05);
     color: var(--text);
     border-radius: 14px;
-    font-weight: 700;
+    font-weight: 800;
   }
 
-  /* Floating Action Button */
+  /* 7) Floating Action Button */
   .fab{
     display:flex;
     align-items:center;
@@ -620,7 +424,7 @@ button, .btn, .miniBtn, .tab, .bn, input, select, textarea{
     z-index: 70;
   }
 
-  /* Fullscreen Composer Sheet */
+  /* 8) Composer Sheet (Overlay) */
   .sheet{
     display:block;
     position: fixed;
@@ -629,7 +433,7 @@ button, .btn, .miniBtn, .tab, .bn, input, select, textarea{
     background: rgba(0,0,0,.55);
     padding: 0;
   }
-  .sheet[hidden]{ display:none; }
+  .sheet[hidden]{ display:none !important; }
 
   .sheetTop{
     position: sticky;
@@ -658,7 +462,7 @@ button, .btn, .miniBtn, .tab, .bn, input, select, textarea{
 
   .grid2{
     display:grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr;
     gap: 10px;
   }
 
@@ -673,27 +477,9 @@ button, .btn, .miniBtn, .tab, .bn, input, select, textarea{
     cursor: pointer;
     padding: 6px 0;
   }
-}
 
-@media (max-width: 420px){
-  .grid2{ grid-template-columns: 1fr; }
-}
-
-@media (max-width: 900px){
-
-  /* Content soll nicht an den Rändern kleben */
-  .container, .wrap, .page, main, .content{
-    padding: 10px !important;
-  }
-
-  /* Cards schöner stapeln */
-  .card{
-    margin: 10px 0 !important;
-  }
-
-  /* CardTop nicht zu eng */
+  /* 9) CardTop nicer */
   .cardTop{
-    display:flex;
     flex-direction: column;
     align-items: flex-start;
     gap: 8px;
@@ -703,80 +489,18 @@ button, .btn, .miniBtn, .tab, .bn, input, select, textarea{
     justify-content: space-between;
   }
 
-  /* Meta-Pills sollen umbrechen statt rauslaufen */
-  .cardMetaRow{
-    display:flex;
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-  .pill{
-    max-width: 100%;
-    white-space: nowrap;
-  }
-
-  /* Reply textarea + Button nicer */
-  .replyBox .textarea{
-    min-height: 110px;
-    font-size: 16px;
-  }
-
-  /* Attachments: 1 Spalte auf Handy */
-  .attachGrid{
-    display: grid;
-    grid-template-columns: 1fr !important;
-    gap: 10px;
-  }
+  /* 10) Attachments als Thumbnail-Liste */
+  .attachGrid{ grid-template-columns: 1fr !important; }
   .attachItem{
     display:flex;
     gap: 10px;
     align-items: center;
+    padding: 10px;
   }
   .attachImg{
     width: 88px;
     height: 88px;
-    object-fit: cover;
     border-radius: 12px;
-  }
-
-  /* Chatbox / DM / Rooms: höher, besser scrollen */
-  #dmBox .card, #roomBox .card{
-    max-height: none !important;
+    object-fit: cover;
   }
 }
-
-@media (max-width: 900px){
-  .tabs, .tabRow{ display:none !important; }
-}
-
-
-/* ===== FINAL MOBILE OVERRIDE (ganz unten lassen) ===== */
-@media (max-width: 900px){
-
-  /* 1) Sidebars wirklich weg */
-  aside.side{ display:none !important; }
-
-  /* 2) BottomNav + FAB + Sheet immer korrekt */
-  .bottomNav{ display:flex !important; }
-  .fab{ display:flex !important; }
-  .sheet{ display:block !important; }
-
-  /* 3) grid2 auf schmalen Handys 1 Spalte */
-  .grid2{ grid-template-columns: 1fr !important; }
-
-  /* 4) Modal: fullscreen (falls es doch mal erscheint) */
-  .modalCard{
-    width: 100% !important;
-    max-width: 100% !important;
-    border-radius: 16px !important;
-  }
-}
-.noScroll{
-  overflow: hidden !important;
-  height: 100% !important;
-}
-
-
-
-
-
-
