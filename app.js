@@ -1443,9 +1443,25 @@ async function renderRooms(){
       .subscribe();
   }
 }
+// BottomNav -> triggert die gleichen Klicks wie deine Tabs (falls vorhanden)
+// Fällt zurück auf state.view + refreshAll() wenn du das hast.
+document.querySelectorAll(".bottomNav .bn").forEach(btn => {
+  btn.addEventListener("click", async () => {
+    const view = btn.dataset.view;
+
+    // 1) Wenn es oben Tabs mit data-view gibt: klicke die automatisch
+    const tab = document.querySelector(`.tab[data-view="${view}"]`);
+    if (tab) { tab.click(); return; }
+
+    // 2) Fallback: wenn du state.view + refreshAll nutzt
+    if (window.state) state.view = view;
+    if (typeof refreshAll === "function") await refreshAll();
+  });
+});
 
 
 boot();
+
 
 
 
