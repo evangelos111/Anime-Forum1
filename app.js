@@ -16,6 +16,7 @@ const QUESTION_TYPES = [
 ];
 
 const el = (id)=>document.getElementById(id);
+
 const escapeHTML = (s)=>String(s ?? "")
   .replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;")
   .replaceAll('"',"&quot;").replaceAll("'","&#039;");
@@ -38,6 +39,10 @@ let state = {
   session: null,
   isAdmin: false,
   presenceChannel: null,
+  dmChannel: null,
+  roomChannel: null,
+  chatMode: null,
+  chatPeerId: null,
 };
 
 /** ====== UI NODES ====== */
@@ -87,6 +92,12 @@ const authMsg = el("authMsg");
 const btnLogin = el("btnLogin");
 const btnSignup = el("btnSignup");
 
+/** Mobile Composer */
+const composerSheet = el("composerSheet");
+const openComposerBtn = el("openComposer");
+const closeComposerBtn = el("closeComposer");
+const submitComposerBtn = el("submitComposer");
+
 /** ====== Modal helper ====== */
 function openModal({ title, contentNode, okText="OK", cancelText="Abbrechen", onOk }) {
   modalTitle.textContent = title;
@@ -116,6 +127,12 @@ function openModal({ title, contentNode, okText="OK", cancelText="Abbrechen", on
   window.onkeydown = (e)=> { if (e.key === "Escape") close(); };
 }
 
+/** ====== Helpers ====== */
+function lockScroll(lock){
+  document.documentElement.classList.toggle("noScroll", lock);
+  document.body.classList.toggle("noScroll", lock);
+}
+
 /** ====== Auth / Profiles ====== */
 function showAuth(msg=""){
   authMsg.textContent = msg;
@@ -127,7 +144,6 @@ function hideAuth(){
 }
 
 async function ensureProfile(user, usernameFromSignup){
-  // exists?
   const { data: existing, error: e1 } = await supabase
     .from("profiles")
     .select("id, username")
@@ -172,7 +188,7 @@ function renderMe(){
   meAdminBadge.classList.toggle("hidden", !state.isAdmin);
 }
 
-/** ====== Presence (Aktive Besucher) ====== */
+/** ====== Presence ====== */
 async function startPresence(){
   if (!state.session?.user) return;
   if (state.presenceChannel) {
@@ -185,11 +201,9 @@ async function startPresence(){
   });
 
   ch.on("presence", { event: "sync" }, () => {
-    const ps = ch.presenceState(); // { key: [{...}] }
+    const ps = ch.presenceState();
     const list = [];
-    Object.values(ps).forEach(arr => {
-      arr.forEach(p => list.push(p));
-    });
+    Object.values(ps).forEach(arr => arr.forEach(p => list.push(p)));
     renderOnline(list);
   });
 
@@ -208,7 +222,6 @@ async function startPresence(){
 }
 
 function renderOnline(list){
-  // dedupe by user_id (take newest)
   const map = new Map();
   for (const p of list){
     const key = p.user_id;
@@ -249,6 +262,7 @@ function renderTabs(){
 }
 
 function renderCategoryFilter(){
+  // Desktop filter
   filterCategory.innerHTML = "";
   ANIME_CATEGORIES.forEach(cat=>{
     const opt = document.createElement("option");
@@ -257,6 +271,30 @@ function renderCategoryFilter(){
     filterCategory.appendChild(opt);
   });
   filterCategory.value = state.category;
+
+  // Mobile composer category
+  const cCat = el("c_category");
+  if (cCat){
+    cCat.innerHTML = "";
+    ANIME_CATEGORIES.filter(x=>x!=="Alle").forEach(cat=>{
+      const opt = document.createElement("option");
+      opt.value = cat;
+      opt.textContent = cat;
+      cCat.appendChild(opt);
+    });
+  }
+
+  // Mobile composer qtype
+  const cQ = el("c_qtype");
+  if (cQ){
+    cQ.innerHTML = "";
+    QUESTION_TYPES.forEach(q=>{
+      const opt = document.createElement("option");
+      opt.value = q;
+      opt.textContent = q;
+      cQ.appendChild(opt);
+    });
+  }
 }
 
 /** ====== Storage Upload ====== */
@@ -276,9 +314,8 @@ async function uploadToAttachmentsBucket(file){
   return { path, publicUrl: data.publicUrl };
 }
 
-/** ====== Data loading ====== */
+/** ====== Follow Lists ====== */
 async function fetchFollowLists(){
-  // followed users
   const { data: fu, error: e1 } = await supabase
     .from("follows_users")
     .select("followed_id, profiles:followed_id(username)")
@@ -314,7 +351,6 @@ async function fetchFollowLists(){
     });
   }
 
-  // followed tags
   const { data: ft, error: e2 } = await supabase
     .from("follows_tags")
     .select("tag")
@@ -351,6 +387,7 @@ async function fetchFollowLists(){
   }
 }
 
+/** ====== Posts ====== */
 function applyClientFilter(posts){
   const q = (state.query || "").toLowerCase();
   const cat = state.category;
@@ -378,8 +415,6 @@ function applyClientFilter(posts){
 }
 
 async function fetchPosts(){
-  // base fetch: public + own already handled by RLS
-  // if "following" view: filter by followed users or tags (client side after fetch for simplicity)
   const { data, error } = await supabase
     .from("posts")
     .select(`
@@ -396,7 +431,6 @@ async function fetchPosts(){
     author: p.author || { username:"—", avatar_url:"", role:"user", points:0 }
   }));
 
-  // attachments (batch)
   const ids = posts.map(p => p.id);
   let attachments = [];
   let replies = [];
@@ -439,7 +473,7 @@ async function fetchPosts(){
     });
   }
 
-  // following filter
+  // Following filter
   if (state.view === "following"){
     const { data: fu } = await supabase
       .from("follows_users")
@@ -472,7 +506,7 @@ async function fetchPosts(){
   }));
 }
 
-/** ====== Render Posts (inkl Admin-Buttons) ====== */
+/** ====== Render Posts ====== */
 function rankForPoints(points){
   if (points >= 800) return "Anime-Legende";
   if (points >= 500) return "Otaku-Veteran";
@@ -522,7 +556,7 @@ function renderAttachmentsHTML(atts, post){
   return `<div class="attachGrid">${items}</div>`;
 }
 
-function renderRepliesHTML(replies, postId){
+function renderRepliesHTML(replies){
   if (!replies?.length) return `<div class="muted">Noch keine Antworten.</div>`;
   return replies.map(r=>{
     const u = r.author || {};
@@ -555,7 +589,6 @@ async function renderPosts(){
   const all = await fetchPosts();
   const posts = applyClientFilter(all);
 
-  // header
   if (state.view === "feed"){ viewTitle.textContent = "Aktuelle Posts"; }
   if (state.view === "following"){ viewTitle.textContent = "Gefolgt"; }
   if (state.view === "mine"){ viewTitle.textContent = "Meine Posts"; }
@@ -610,13 +643,12 @@ async function renderPosts(){
       </div>
 
       ${tagsRow}
-
       ${renderAttachmentsHTML(p.attachments || [], p)}
 
       <div class="replyBox" id="rb-${p.id}">
         <div class="muted">Antworten:</div>
         <div id="replyList-${p.id}">
-          ${renderRepliesHTML(p.replies || [], p.id)}
+          ${renderRepliesHTML(p.replies || [])}
         </div>
 
         <div class="field">
@@ -630,13 +662,12 @@ async function renderPosts(){
     postList.appendChild(card);
   }
 
-  // Handlers: delete post
+  // delete post
   postList.querySelectorAll("[data-del-post]").forEach(btn=>{
     btn.onclick = async ()=>{
       const id = btn.getAttribute("data-del-post");
       if (!confirm("Post wirklich löschen?")) return;
 
-      // delete attachments storage objects first
       const { data: atts } = await supabase.from("post_attachments").select("id, path").eq("post_id", id);
       if (atts?.length){
         await supabase.storage.from("attachments").remove(atts.map(x=>x.path));
@@ -647,7 +678,7 @@ async function renderPosts(){
     };
   });
 
-  // Handlers: delete reply
+  // delete reply
   postList.querySelectorAll("[data-del-reply]").forEach(btn=>{
     btn.onclick = async ()=>{
       const id = btn.getAttribute("data-del-reply");
@@ -657,7 +688,7 @@ async function renderPosts(){
     };
   });
 
-  // Handlers: delete attachment
+  // delete attachment
   postList.querySelectorAll("[data-del-attach]").forEach(btn=>{
     btn.onclick = async ()=>{
       const id = btn.getAttribute("data-del-attach");
@@ -669,7 +700,7 @@ async function renderPosts(){
     };
   });
 
-  // Handlers: send reply
+  // send reply
   postList.querySelectorAll("[data-send-reply]").forEach(btn=>{
     btn.onclick = async ()=>{
       const postId = btn.getAttribute("data-send-reply");
@@ -788,6 +819,7 @@ function changeAvatarModal(){
     }
   });
 }
+
 async function createPostWithUploads({
   category, title, body, privacy,
   animeTitle, tags, questionType,
@@ -829,11 +861,12 @@ async function createPostWithUploads({
   return created.id;
 }
 
-
 function newPostModal(){
   const wrap = document.createElement("div");
-  const catOptions = ANIME_CATEGORIES.filter(x=>x!=="Alle").map(c=>`<option value="${c}">${escapeHTML(c)}</option>`).join("");
-  const qOptions = QUESTION_TYPES.map(q=>`<option value="${q}">${escapeHTML(q)}</option>`).join("");
+  const catOptions = ANIME_CATEGORIES.filter(x=>x!=="Alle")
+    .map(c=>`<option value="${c}">${escapeHTML(c)}</option>`).join("");
+  const qOptions = QUESTION_TYPES
+    .map(q=>`<option value="${q}">${escapeHTML(q)}</option>`).join("");
 
   wrap.innerHTML = `
     <div class="field">
@@ -895,65 +928,42 @@ function newPostModal(){
     title:"Post verfassen",
     contentNode: wrap,
     okText:"Posten",
-onOk: async ()=> {
-  const category = wrap.querySelector("#pCat").value;
-  const title = (wrap.querySelector("#pTitle").value || "").trim();
-  const body = (wrap.querySelector("#pBody").value || "").trim();
-  const privacy = wrap.querySelector("#pPrivacy").value;
+    onOk: async ()=>{
+      const category = wrap.querySelector("#pCat").value;
+      const title = (wrap.querySelector("#pTitle").value || "").trim();
+      const body = (wrap.querySelector("#pBody").value || "").trim();
+      const privacy = wrap.querySelector("#pPrivacy").value;
 
-  if (!category || !title || !body) return false;
+      if (!category || !title || !body) return false;
 
-  const animeTitle = (wrap.querySelector("#pAnime").value || "").trim();
-  const tags = parseTags(wrap.querySelector("#pTags").value);
-  const questionType = wrap.querySelector("#pQ").value;
-  const spoiler = wrap.querySelector("#pSpoiler").checked;
-  const spoilerTo = (wrap.querySelector("#pSpoilerTo").value || "").trim();
+      const animeTitle = (wrap.querySelector("#pAnime").value || "").trim();
+      const tags = parseTags(wrap.querySelector("#pTags").value);
+      const questionType = wrap.querySelector("#pQ").value;
+      const spoiler = wrap.querySelector("#pSpoiler").checked;
+      const spoilerTo = (wrap.querySelector("#pSpoilerTo").value || "").trim();
 
-  try {
-    await createPostWithUploads({
-      category,
-      title,
-      body,
-      privacy,
-      animeTitle,
-      tags,
-      questionType,
-      spoiler,
-      spoilerTo,
-      files: wrap.querySelector("#pFiles").files
-    });
-
-    state.view = "mine";
-    state.mineFilter = privacy;
-    await refreshAll(true);
-    return true;
-  } catch (err) {
-    alert(err.message);
-    return false;
-  }
-}
-
-
-
-      // 2) upload files + insert attachment rows
-      const files = Array.from(wrap.querySelector("#pFiles").files || []);
-      for (const f of files){
-        const up = await uploadToAttachmentsBucket(f);
-        const { error: ea } = await supabase.from("post_attachments").insert({
-          post_id: created.id,
-          author_id: state.session.user.id,
-          path: up.path,
-          file_name: f.name,
-          mime_type: f.type || null,
-          size: f.size
+      try {
+        await createPostWithUploads({
+          category,
+          title,
+          body,
+          privacy,
+          animeTitle,
+          tags,
+          questionType,
+          spoiler,
+          spoilerTo,
+          files: wrap.querySelector("#pFiles").files
         });
-        if (ea) { alert(ea.message); return false; }
-      }
 
-      state.view = "mine";
-      state.mineFilter = privacy;
-      await refreshAll(true);
-      return true;
+        state.view = "mine";
+        state.mineFilter = privacy;
+        await refreshAll(true);
+        return true;
+      } catch (err) {
+        alert(err.message);
+        return false;
+      }
     }
   });
 }
@@ -970,133 +980,11 @@ async function refreshAll(reloadMe=false){
   await renderPosts();
 }
 
-/** ====== Events ====== */
-tabs.forEach(t=>{
-  t.onclick = async ()=>{
-    state.view = t.dataset.view;
-    if (state.view === "friends") { await renderFriendsView(); return; }
-    if (state.view === "chat") { await renderChatView(); return; }
-
-    renderTabs();
-    await renderPosts();
-  };
-});
-
-document.addEventListener("focusin", (e) => {
-  const x = e.target;
-  if (x && (x.tagName === "INPUT" || x.tagName === "TEXTAREA" || x.tagName === "SELECT")) {
-    setTimeout(() => x.scrollIntoView({ block: "center", behavior: "smooth" }), 150);
-  }
-});
-
-
-search.oninput = ()=>{ state.query = search.value || ""; renderPosts(); };
-filterCategory.onchange = ()=>{ state.category = filterCategory.value || "Alle"; renderPosts(); };
-
-btnNewPost.onclick = () => {
-  const isMobile = window.matchMedia("(max-width: 900px)").matches;
-  if (isMobile && composerSheet) {
-    composerSheet.hidden = false;
-    setTimeout(() => document.getElementById("c_body")?.focus(), 80);
-  } else {
-    newPostModal();
-  }
-};
-
-btnChangeAvatar.onclick = changeAvatarModal;
-btnAddFollow.onclick = addFollowModal;
-btnAddTopic.onclick = addTopicModal;
-
-btnLogout.onclick = async ()=>{
-  await supabase.auth.signOut();
-  location.reload();
-};
-
-/** ====== Auth overlay actions ====== */
-btnLogin.onclick = async ()=>{
-  authMsg.textContent = "Logge ein…";
-  try{
-    const email = authEmail.value.trim();
-    const password = authPass.value;
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw error;
-    state.session = data.session;
-    await loadMe();
-    hideAuth();
-    renderMe();
-    renderCategoryFilter();
-    await startPresence();
-    await refreshAll();
-  }catch(err){
-    authMsg.textContent = err.message;
-  }
-};
-
-btnSignup.onclick = async ()=>{
-  authMsg.textContent = "Registriere…";
-  try{
-    const email = authEmail.value.trim();
-    const password = authPass.value;
-    const username = authUser.value.trim();
-    if (!username) throw new Error("Username fehlt.");
-
-    const { data, error } = await supabase.auth.signUp({ email, password });
-    if (error) throw error;
-
-    // If email confirmation is ON, user might not have session yet.
-    // Try to sign in immediately (works if confirmation OFF).
-    const { data: si, error: e2 } = await supabase.auth.signInWithPassword({ email, password });
-    if (e2) throw e2;
-
-    state.session = si.session;
-    await ensureProfile(si.session.user, username);
-    await loadMe();
-
-    hideAuth();
-    renderMe();
-    renderCategoryFilter();
-    await startPresence();
-    await refreshAll(true);
-  }catch(err){
-    authMsg.textContent = err.message;
-  }
-};
-
-/** ====== Boot ====== */
-async function boot(){
-  renderCategoryFilter();
-
-  const { data } = await supabase.auth.getSession();
-  state.session = data.session;
-
-  if (!state.session){
-    showAuth("Bitte einloggen oder registrieren.");
-    return;
-  }
-
-  // Ensure profile exists (in case)
-  const { data: { user } } = await supabase.auth.getUser();
-  if (user){
-    // if profile missing, user must create username (rare)
-    try{
-      await ensureProfile(user, "");
-    }catch{
-      showAuth("Bitte registrieren (Username fehlt).");
-      return;
-    }
-  }
-
-  await loadMe();
-  renderMe();
-  renderTabs();
-  await startPresence();
-  await refreshAll();
-}
+/** ====== Friends & Chat ====== */
 async function renderFriendsView(){
   viewTitle.textContent = "Freunde";
   viewMeta.textContent = "";
 
-  // 1) Freunde laden
   const uid = state.session.user.id;
   const { data: fr, error: e1 } = await supabase
     .from("friends")
@@ -1113,7 +1001,6 @@ async function renderFriendsView(){
     friends = ps || [];
   }
 
-  // 2) Requests laden
   const { data: req, error: e2 } = await supabase
     .from("friend_requests")
     .select("id, sender_id, receiver_id, status, created_at, sender:profiles!friend_requests_sender_id_fkey(username), receiver:profiles!friend_requests_receiver_id_fkey(username)")
@@ -1156,7 +1043,6 @@ async function renderFriendsView(){
     `).join("");
   }
 
-  // Requests render
   const pending = (req||[]).filter(r=>r.status==="pending");
   if (!pending.length){
     reqList.innerHTML = `<div class="muted">Keine offenen Anfragen.</div>`;
@@ -1179,7 +1065,6 @@ async function renderFriendsView(){
     }).join("");
   }
 
-  // send request modal
   document.getElementById("btnSendReq").onclick = ()=>{
     const wrap = document.createElement("div");
     wrap.innerHTML = `
@@ -1212,7 +1097,6 @@ async function renderFriendsView(){
     });
   };
 
-  // accept/reject/cancel
   reqList.querySelectorAll("[data-accept]").forEach(b=>{
     b.onclick = async ()=>{
       const id = b.getAttribute("data-accept");
@@ -1237,7 +1121,6 @@ async function renderFriendsView(){
     };
   });
 
-  // open DM
   friendsList.querySelectorAll("[data-open-dm]").forEach(b=>{
     b.onclick = async ()=>{
       state.view = "chat";
@@ -1272,7 +1155,6 @@ async function renderChatView(){
     </div>
   `;
 
-  // DM pick modal
   document.getElementById("btnPickDm").onclick = async ()=>{
     const uid = state.session.user.id;
     const { data: fr } = await supabase.from("friends").select("low_id, high_id").or(`low_id.eq.${uid},high_id.eq.${uid}`);
@@ -1302,10 +1184,8 @@ async function renderChatView(){
     });
   };
 
-  // Rooms list
   await renderRooms();
 
-  // If already selected DM from friends view
   if (state.chatMode === "dm" && state.chatPeerId){
     await renderDM();
   }
@@ -1321,7 +1201,6 @@ async function renderDM(){
   const { data: peerP } = await supabase.from("profiles").select("username").eq("id", peer).maybeSingle();
   dmHint.textContent = `DM mit ${peerP?.username || "—"}`;
 
-  // load messages (last 50)
   const { data, error } = await supabase
     .from("dm_messages")
     .select("id, sender_id, receiver_id, body, created_at")
@@ -1363,7 +1242,6 @@ async function renderDM(){
     await renderDM();
   };
 
-  // Realtime DM refresh (einfach & stabil)
   if (state.dmChannel) supabase.removeChannel(state.dmChannel);
   state.dmChannel = supabase.channel(`dm-${uid}-${peer}`);
   state.dmChannel
@@ -1383,7 +1261,6 @@ async function renderRooms(){
   const roomBox = document.getElementById("roomBox");
   const uid = state.session.user.id;
 
-  // rooms where member
   const { data: mem } = await supabase
     .from("chat_room_members")
     .select("room_id, room:chat_rooms(id,name,owner_id)")
@@ -1401,7 +1278,6 @@ async function renderRooms(){
     </div>
   `).join("") : `<div class="muted">Du bist in keinen Räumen.</div>`;
 
-  // create room
   document.getElementById("btnNewRoom").onclick = ()=>{
     const wrap = document.createElement("div");
     wrap.innerHTML = `
@@ -1426,7 +1302,6 @@ async function renderRooms(){
 
         if (error) { alert(error.message); return false; }
 
-        // owner becomes member
         await supabase.from("chat_room_members").insert({ room_id: room.id, user_id: uid });
 
         await renderRooms();
@@ -1435,7 +1310,6 @@ async function renderRooms(){
     });
   };
 
-  // open room
   rooms.querySelectorAll("[data-open-room]").forEach(b=>{
     b.onclick = async ()=>{
       const rid = b.getAttribute("data-open-room");
@@ -1489,7 +1363,6 @@ async function renderRooms(){
       await renderRoom(roomId);
     };
 
-    // Realtime room refresh
     if (state.roomChannel) supabase.removeChannel(state.roomChannel);
     state.roomChannel = supabase.channel(`room-${roomId}`);
     state.roomChannel
@@ -1500,11 +1373,51 @@ async function renderRooms(){
       .subscribe();
   }
 }
-// BottomNav -> triggert die gleichen Klicks wie deine Tabs (falls vorhanden)
-// Fällt zurück auf state.view + refreshAll() wenn du das hast.
 
+/** ====== Events ====== */
+tabs.forEach(t=>{
+  t.onclick = async ()=>{
+    state.view = t.dataset.view;
+    if (state.view === "friends") { await renderFriendsView(); return; }
+    if (state.view === "chat") { await renderChatView(); return; }
 
-// ===== Mobile: BottomNav klickt Views an (nutzt Tabs, falls vorhanden) =====
+    renderTabs();
+    await renderPosts();
+  };
+});
+
+subtabs().forEach(s=>{
+  s.onclick = async ()=>{
+    state.mineFilter = s.dataset.mine;
+    renderTabs();
+    await renderPosts();
+  };
+});
+
+search.oninput = ()=>{ state.query = search.value || ""; renderPosts(); };
+filterCategory.onchange = ()=>{ state.category = filterCategory.value || "Alle"; renderPosts(); };
+
+btnNewPost.onclick = () => {
+  const isMobile = window.matchMedia("(max-width: 900px)").matches;
+  if (isMobile && composerSheet) {
+    composerSheet.hidden = false;
+    lockScroll(true);
+    setTimeout(() => el("c_body")?.focus(), 80);
+  } else {
+    newPostModal();
+  }
+};
+
+btnChangeAvatar.onclick = changeAvatarModal;
+btnAddFollow.onclick = addFollowModal;
+btnAddTopic.onclick = addTopicModal;
+
+btnLogout.onclick = async ()=>{
+  await supabase.auth.signOut();
+  location.reload();
+};
+
+/** ====== Mobile BottomNav ====== */
 document.querySelectorAll(".bottomNav .bn").forEach(btn => {
   btn.addEventListener("click", async () => {
     const view = btn.dataset.view;
@@ -1519,111 +1432,139 @@ document.querySelectorAll(".bottomNav .bn").forEach(btn => {
   });
 });
 
-
-// ===== Mobile: Composer Sheet =====
-const composerSheet = document.getElementById("composerSheet");
-const openComposerBtn = document.getElementById("openComposer");
-const closeComposerBtn = document.getElementById("closeComposer");
-const submitComposerBtn = document.getElementById("submitComposer");
-
-if (openComposerBtn && composerSheet) {
-  openComposerBtn.addEventListener("click", () => {
-    composerSheet.hidden = false;
-    // Fokus direkt ins Textfeld
-    setTimeout(() => document.getElementById("c_body")?.focus(), 80);
-  });
-}
-if (closeComposerBtn && composerSheet) {
-  closeComposerBtn.addEventListener("click", () => {
-    composerSheet.hidden = true;
-  });
-}
-
-// Wenn du schon eine Funktion zum Posten hast, ruf sie hier auf.
-// Beispiel: createPostFromComposer(); -> musst du an deinen Code anpassen.
-if (submitComposerBtn) {
-  submitComposerBtn.addEventListener("click", async () => {
-    try {
-      const category = document.getElementById("c_category")?.value || "Allgemein";
-      const privacy  = document.getElementById("c_privacy")?.value || "public";
-
-      const title = (document.getElementById("c_title")?.value || "").trim();
-      const body  = (document.getElementById("c_body")?.value  || "").trim();
-      if (!body) { alert("Nachricht ist Pflicht."); return; }
-
-      const animeTitle = (document.getElementById("c_anime")?.value || "").trim();
-      const questionType = document.getElementById("c_qtype")?.value || null;
-      const spoiler = (document.getElementById("c_spoiler")?.value === "true");
-      const tags = parseTags(document.getElementById("c_tags")?.value || "");
-
-      // Datei: dein Handy-Composer hat i.d.R. nur 1 File Input
-      const files = document.getElementById("c_file")?.files || [];
-
-      await createPostWithUploads({
-        category,
-        title: title || "(ohne Titel)",
-        body,
-        privacy,
-        animeTitle,
-        tags,
-        questionType,
-        spoiler,
-        spoilerTo: null,
-        files
-      });
-
-      // schließen + feed neu laden
-      if (composerSheet) composerSheet.hidden = true;
-      state.view = "mine";
-      state.mineFilter = privacy;
-      await refreshAll(true);
-
-      // Felder leeren
-      if (document.getElementById("c_title")) document.getElementById("c_title").value = "";
-      if (document.getElementById("c_body")) document.getElementById("c_body").value = "";
-      if (document.getElementById("c_anime")) document.getElementById("c_anime").value = "";
-      if (document.getElementById("c_tags")) document.getElementById("c_tags").value = "";
-      if (document.getElementById("c_file")) document.getElementById("c_file").value = "";
-
-    } catch (err) {
-      alert(err.message);
-    }
-  });
-}
-
-function lockScroll(lock){
-  document.documentElement.classList.toggle("noScroll", lock);
-  document.body.classList.toggle("noScroll", lock);
-}
-
+/** ====== Mobile Composer ====== */
 openComposerBtn?.addEventListener("click", () => {
   composerSheet.hidden = false;
   lockScroll(true);
-  setTimeout(() => document.getElementById("c_body")?.focus(), 80);
+  setTimeout(() => el("c_body")?.focus(), 80);
 });
 
 closeComposerBtn?.addEventListener("click", () => {
   composerSheet.hidden = true;
   lockScroll(false);
 });
-composerSheet.hidden = true;
-lockScroll(false);
 
+submitComposerBtn?.addEventListener("click", async () => {
+  try {
+    const category = el("c_category")?.value || ANIME_CATEGORIES[1];
+    const privacy  = el("c_privacy")?.value || "public";
 
-// ===== Mobile: Keyboard-Friendly Scroll =====
+    const title = (el("c_title")?.value || "").trim();
+    const body  = (el("c_body")?.value  || "").trim();
+    if (!body) { alert("Nachricht ist Pflicht."); return; }
 
+    const animeTitle = (el("c_anime")?.value || "").trim();
+    const questionType = el("c_qtype")?.value || null;
+    const spoiler = (el("c_spoiler")?.value === "true");
+    const tags = parseTags(el("c_tags")?.value || "");
+    const files = el("c_file")?.files || [];
 
+    await createPostWithUploads({
+      category,
+      title: title || "(ohne Titel)",
+      body,
+      privacy,
+      animeTitle,
+      tags,
+      questionType,
+      spoiler,
+      spoilerTo: null,
+      files
+    });
+
+    composerSheet.hidden = true;
+    lockScroll(false);
+
+    state.view = "mine";
+    state.mineFilter = privacy;
+    await refreshAll(true);
+
+    if (el("c_title")) el("c_title").value = "";
+    if (el("c_body")) el("c_body").value = "";
+    if (el("c_anime")) el("c_anime").value = "";
+    if (el("c_tags")) el("c_tags").value = "";
+    if (el("c_file")) el("c_file").value = "";
+
+  } catch (err) {
+    alert(err.message);
+  }
+});
+
+/** ====== Auth overlay actions ====== */
+btnLogin.onclick = async ()=>{
+  authMsg.textContent = "Logge ein…";
+  try{
+    const email = authEmail.value.trim();
+    const password = authPass.value;
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    state.session = data.session;
+    await loadMe();
+    hideAuth();
+    renderMe();
+    renderCategoryFilter();
+    await startPresence();
+    await refreshAll();
+  }catch(err){
+    authMsg.textContent = err.message;
+  }
+};
+
+btnSignup.onclick = async ()=>{
+  authMsg.textContent = "Registriere…";
+  try{
+    const email = authEmail.value.trim();
+    const password = authPass.value;
+    const username = authUser.value.trim();
+    if (!username) throw new Error("Username fehlt.");
+
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    if (error) throw error;
+
+    const { data: si, error: e2 } = await supabase.auth.signInWithPassword({ email, password });
+    if (e2) throw e2;
+
+    state.session = si.session;
+    await ensureProfile(si.session.user, username);
+    await loadMe();
+
+    hideAuth();
+    renderMe();
+    renderCategoryFilter();
+    await startPresence();
+    await refreshAll(true);
+  }catch(err){
+    authMsg.textContent = err.message;
+  }
+};
+
+/** ====== Boot ====== */
+async function boot(){
+  renderCategoryFilter();
+
+  const { data } = await supabase.auth.getSession();
+  state.session = data.session;
+
+  if (!state.session){
+    showAuth("Bitte einloggen oder registrieren.");
+    return;
+  }
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user){
+    try{
+      await ensureProfile(user, "");
+    }catch{
+      showAuth("Bitte registrieren (Username fehlt).");
+      return;
+    }
+  }
+
+  await loadMe();
+  renderMe();
+  renderTabs();
+  await startPresence();
+  await refreshAll();
+}
 
 boot();
-
-
-
-
-
-
-
-
-
-
-
-
