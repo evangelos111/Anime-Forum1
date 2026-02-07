@@ -1466,9 +1466,77 @@ document.addEventListener("focusin", (e) => {
   }
 });
 
+// ===== Mobile: BottomNav klickt Views an (nutzt Tabs, falls vorhanden) =====
+document.querySelectorAll(".bottomNav .bn").forEach(btn => {
+  btn.addEventListener("click", async () => {
+    const view = btn.dataset.view;
+
+    // wenn oben Tabs existieren, nutze sie
+    const tab = document.querySelector(`.tab[data-view="${view}"]`);
+    if (tab) { tab.click(); return; }
+
+    // fallback wenn du state + refreshAll hast
+    if (window.state) state.view = view;
+    if (typeof refreshAll === "function") await refreshAll();
+  });
+});
+
+// ===== Mobile: Composer Sheet =====
+const composerSheet = document.getElementById("composerSheet");
+const openComposerBtn = document.getElementById("openComposer");
+const closeComposerBtn = document.getElementById("closeComposer");
+const submitComposerBtn = document.getElementById("submitComposer");
+
+if (openComposerBtn && composerSheet) {
+  openComposerBtn.addEventListener("click", () => {
+    composerSheet.hidden = false;
+    // Fokus direkt ins Textfeld
+    setTimeout(() => document.getElementById("c_body")?.focus(), 80);
+  });
+}
+if (closeComposerBtn && composerSheet) {
+  closeComposerBtn.addEventListener("click", () => {
+    composerSheet.hidden = true;
+  });
+}
+
+// Wenn du schon eine Funktion zum Posten hast, ruf sie hier auf.
+// Beispiel: createPostFromComposer(); -> musst du an deinen Code anpassen.
+if (submitComposerBtn) {
+  submitComposerBtn.addEventListener("click", async () => {
+    // Minimal-Validierung
+    const body = (document.getElementById("c_body")?.value || "").trim();
+    if (!body) { alert("Nachricht ist Pflicht."); return; }
+
+    // TODO: hier musst du an deine bestehende Post-Create Funktion andocken
+    // Beispiel (du passt die Funktionsnamen an):
+    // await createPost({
+    //   title: document.getElementById("c_title").value,
+    //   body,
+    //   category: document.getElementById("c_category").value,
+    //   privacy: document.getElementById("c_privacy").value,
+    //   anime_title: document.getElementById("c_anime").value,
+    //   question_type: document.getElementById("c_qtype").value,
+    //   spoiler: document.getElementById("c_spoiler").value === "true",
+    //   tags: (document.getElementById("c_tags").value||"").split(",").map(s=>s.trim()).filter(Boolean),
+    //   file: document.getElementById("c_file").files?.[0] || null
+    // });
+
+    alert("Composer ist drin – jetzt muss ich ihn mit deiner Post-Funktion verbinden.");
+  });
+}
+
+// ===== Mobile: Keyboard-Friendly Scroll =====
+document.addEventListener("focusin", (e) => {
+  const el = e.target;
+  if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT")) {
+    setTimeout(() => el.scrollIntoView({ block: "center", behavior: "smooth" }), 150);
+  }
+});
 
 
 boot();
+
 
 
 
