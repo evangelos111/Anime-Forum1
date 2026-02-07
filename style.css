@@ -486,4 +486,74 @@ button, .btn, .miniBtn, .tab, .bn, input, select, textarea{
   }
 }
 
+/* ===== Mobile: Post Composer easier ===== */
+@media (max-width: 900px){
+
+  /* wenn dein Post-Form in einer Card/Panel ist */
+  .composer, .postComposer, .createPost, .newPostPanel{
+    border-radius: 16px;
+  }
+
+  /* Fullscreen Modal Styling (falls du schon modals hast) */
+  .modal.fullscreen .modalContent,
+  .modal.fullscreen .dialog,
+  .modal.fullscreen .content{
+    width: 100vw;
+    max-width: 100vw;
+    height: 100dvh;
+    max-height: 100dvh;
+    border-radius: 0;
+    padding: 12px;
+    overflow: hidden;
+  }
+
+  .composerBody{
+    height: calc(100dvh - 120px);
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 18px;
+  }
+
+  .composerActions{
+    position: sticky;
+    bottom: 0;
+    display: flex;
+    gap: 10px;
+    padding: 10px 0 8px;
+    border-top: 1px solid var(--line);
+    background: rgba(17,24,39,.92);
+    backdrop-filter: blur(12px);
+  }
+  .composerActions .btn{
+    flex: 1;
+    min-height: 48px;
+    border-radius: 14px;
+  }
+
+  /* Inputs noch angenehmer */
+  textarea{
+    min-height: 140px;
+    resize: vertical;
+  }
+
+  /* Optional block (anime details) collapsible look */
+  details.composerDetails{
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 8px 10px;
+    background: rgba(255,255,255,.04);
+  }
+  details.composerDetails summary{
+    cursor: pointer;
+    font-weight: 700;
+    padding: 8px 0;
+  }
+
+  /* File input nicer */
+  input[type="file"]{
+    width: 100%;
+  }
+}
+
+
 
