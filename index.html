@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Anime Community</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">A</div>
+      <div>
+        <div class="title">Anime Community</div>
+        <div class="subtitle">Feed • Gefolgt • Meine Posts</div>
+      </div>
+    </div>
+
+    <nav class="tabs" aria-label="Navigation">
+      <button class="tab active" data-view="feed">Feed</button>
+      <button class="tab" data-view="following">Gefolgt</button>
+      <button class="tab" data-view="mine">Meine Posts</button>
+    </nav>
+
+    <div class="actions">
+      <button id="btnNewPost" class="btn primary">+ Post verfassen</button>
+      <button id="btnLogout" class="btn">Logout</button>
+    </div>
+  </header>
+
+  <main class="page">
+    <aside class="side">
+      <div class="panel">
+        <div class="profileCard">
+          <div class="avatarWrap">
+            <img id="meAvatar" class="avatar" alt="Profilbild" />
+          </div>
+          <div class="profileInfo">
+            <div class="profileNameRow">
+              <div class="profileName" id="meName">—</div>
+              <span id="meAdminBadge" class="pill hidden">ADMIN</span>
+            </div>
+            <div class="profileRank">
+              Rang: <span class="pill" id="meRank"></span>
+              <span class="muted" id="mePoints"></span>
+            </div>
+
+            <button id="btnChangeAvatar" class="btn small">Profilbild ändern</button>
+          </div>
+        </div>
+        <div class="smallNote">Rang ist serverseitig (nicht fälschbar).</div>
+      </div>
+
+      <div class="panel">
+        <h3>Suche</h3>
+        <input id="search" class="input" placeholder="Posts durchsuchen…" />
+      </div>
+
+      <div class="panel">
+        <h3>Feed-Filter</h3>
+        <div class="field">
+          <div class="label">Kategorie</div>
+          <select id="filterCategory" class="select"></select>
+        </div>
+      </div>
+    </aside>
+
+    <section class="center">
+      <div class="panel centerHeader">
+        <div class="left">
+          <h3 id="viewTitle">Aktuelle Posts</h3>
+          <div class="muted" id="viewMeta"></div>
+        </div>
+
+        <div id="mineSubtabs" class="subtabs hidden">
+          <button class="subtab active" data-mine="public">Öffentlich</button>
+          <button class="subtab" data-mine="friends">Freunde</button>
+          <button class="subtab" data-mine="private">Privat</button>
+        </div>
+      </div>
+
+      <div id="postList" class="feed"></div>
+    </section>
+
+    <aside class="side">
+      <div class="panel">
+        <div class="panelHeader">
+          <h3>Aktive Besucher</h3>
+          <span class="pill" id="onlineCount">0</span>
+        </div>
+        <div id="onlineList" class="followList"></div>
+        <div class="smallNote">Live-Presence (Realtime).</div>
+      </div>
+
+      <div class="panel">
+        <div class="panelHeader">
+          <h3>Gefolgte Accounts</h3>
+          <button id="btnAddFollow" class="btn small">+ Folgen</button>
+        </div>
+        <div id="followList" class="followList"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panelHeader">
+          <h3>Gefolgte Themen (Tags)</h3>
+          <button id="btnAddTopic" class="btn small">+ Tag</button>
+        </div>
+        <div id="topicList" class="followList"></div>
+      </div>
+    </aside>
+  </main>
+
+  <!-- Modal -->
+  <div id="modal" class="modal hidden" aria-hidden="true">
+    <div class="modalCard">
+      <div class="modalHeader">
+        <h3 id="modalTitle"></h3>
+        <button id="modalClose" class="iconBtn" aria-label="Schließen">✕</button>
+      </div>
+      <div id="modalBody"></div>
+      <div class="modalFooter">
+        <button id="modalCancel" class="btn">Abbrechen</button>
+        <button id="modalOk" class="btn primary">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Auth Overlay -->
+  <div id="authOverlay" class="authOverlay hidden">
+    <div class="authCard">
+      <h2>Login / Registrierung</h2>
+      <p class="muted">Du brauchst einen Account, damit alles global gespeichert wird.</p>
+
+      <div class="field">
+        <div class="label">E-Mail</div>
+        <input id="authEmail" class="input" placeholder="email@example.com" />
+      </div>
+
+      <div class="field">
+        <div class="label">Passwort</div>
+        <input id="authPass" class="input" type="password" placeholder="mind. 6 Zeichen" />
+      </div>
+
+      <div class="field" id="signupOnly">
+        <div class="label">Username (nur bei Registrierung)</div>
+        <input id="authUser" class="input" placeholder="z.B. AnimeKing" />
+      </div>
+
+      <div class="row">
+        <button id="btnLogin" class="btn primary">Login</button>
+        <button id="btnSignup" class="btn">Registrieren</button>
+      </div>
+
+      <div id="authMsg" class="smallNote"></div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
