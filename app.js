@@ -992,7 +992,16 @@ document.addEventListener("click", (e)=>{
 search.oninput = ()=>{ state.query = search.value || ""; renderPosts(); };
 filterCategory.onchange = ()=>{ state.category = filterCategory.value || "Alle"; renderPosts(); };
 
-btnNewPost.onclick = newPostModal;
+btnNewPost.onclick = () => {
+  const isMobile = window.matchMedia("(max-width: 900px)").matches;
+  if (isMobile && composerSheet) {
+    composerSheet.hidden = false;
+    setTimeout(() => document.getElementById("c_body")?.focus(), 80);
+  } else {
+    newPostModal();
+  }
+};
+
 btnChangeAvatar.onclick = changeAvatarModal;
 btnAddFollow.onclick = addFollowModal;
 btnAddTopic.onclick = addTopicModal;
@@ -1610,6 +1619,7 @@ document.addEventListener("focusin", (e) => {
 
 
 boot();
+
 
 
 
